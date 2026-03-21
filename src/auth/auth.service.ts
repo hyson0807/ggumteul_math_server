@@ -9,18 +9,11 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-
-const USER_PUBLIC_SELECT = {
-  id: true,
-  email: true,
-  name: true,
-  grade: true,
-  level: true,
-  coins: true,
-  stars: true,
-  tutorType: true,
-  createdAt: true,
-};
+import {
+  USER_PUBLIC_SELECT,
+  USER_WITH_PASSWORD_SELECT,
+  USER_WITH_REFRESH_SELECT,
+} from '../common/constants/user-select';
 
 @Injectable()
 export class AuthService {
@@ -37,23 +30,24 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const exists = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-    if (exists) {
-      throw new ConflictException('이미 사용 중인 이메일입니다.');
-    }
-
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        grade: dto.grade,
-      },
-      select: USER_PUBLIC_SELECT,
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          grade: dto.grade,
+        },
+        select: USER_PUBLIC_SELECT,
+      });
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        throw new ConflictException('이미 사용 중인 이메일입니다.');
+      }
+      throw e;
+    }
 
     const tokens = await this.issueTokens(user.id);
     return { ...tokens, user };
@@ -62,18 +56,23 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      select: USER_WITH_PASSWORD_SELECT,
     });
     if (!user) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
-    const tokens = await this.issueTokens(user.id);
-    const { passwordHash: _, refreshToken: __, ...publicUser } = user;
+    const { passwordHash: _, ...publicUser } = user;
+    const tokens = await this.issueTokens(publicUser.id);
     return { ...tokens, user: publicUser };
   }
 
@@ -89,6 +88,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: USER_WITH_REFRESH_SELECT,
     });
     if (!user || !user.refreshToken) {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
@@ -99,8 +99,8 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
 
-    const tokens = await this.issueTokens(user.id);
-    const { passwordHash: _, refreshToken: __, ...publicUser } = user;
+    const { refreshToken: _rt, ...publicUser } = user;
+    const tokens = await this.issueTokens(publicUser.id);
     return { ...tokens, user: publicUser };
   }
 
