@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────
+// User
+// ──────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  grade        Int
+  level        Int      @default(1)
+  coins        Int      @default(0)
+  stars        Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  village         Village?
+  learningRecords LearningRecord[]
+  inventory       Inventory[]
+
+  @@map("user")
+}
+
+// ──────────────────────────────────
+// Concept & Concept Relation
+// ──────────────────────────────────
+model Concept {
+  id    Int    @id @default(autoincrement())
+  name  String
+  grade Int
+  order Int
+
+  problems              Problem[]
+  prerequisiteRelations ConceptRelation[] @relation("TargetConcept")
+  targetRelations       ConceptRelation[] @relation("PrerequisiteConcept")
+
+  @@map("concept")
+}
+
+model ConceptRelation {
+  id                    Int @id @default(autoincrement())
+  prerequisiteConceptId Int @map("prerequisite_concept_id")
+  targetConceptId       Int @map("target_concept_id")
+
+  prerequisiteConcept Concept @relation("PrerequisiteConcept", fields: [prerequisiteConceptId], references: [id])
+  targetConcept       Concept @relation("TargetConcept", fields: [targetConceptId], references: [id])
+
+  @@map("concept_relation")
+}
+
+// ──────────────────────────────────
+// Problem
+// ──────────────────────────────────
+model Problem {
+  id          String  @id @default(uuid())
+  conceptId   Int     @map("concept_id")
+  difficulty  Int
+  content     String
+  imageUrl    String? @map("image_url")
+  answer      String
+  explanation String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  concept         Concept          @relation(fields: [conceptId], references: [id])
+  learningRecords LearningRecord[]
+
+  @@map("problem")
+}
+
+// ──────────────────────────────────
+// Learning Record
+// ──────────────────────────────────
+model LearningRecord {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  problemId   String   @map("problem_id")
+  correct     Boolean
+  answerGiven String   @map("answer_given")
+  timeSpent   Int      @map("time_spent")
+  coinsEarned Int      @map("coins_earned")
+  starsEarned Int      @map("stars_earned")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  problem Problem @relation(fields: [problemId], references: [id])
+
+  @@map("learning_record")
+}
+
+// ──────────────────────────────────
+// Village & Village Item
+// ──────────────────────────────────
+model Village {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  level     Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User          @relation(fields: [userId], references: [id])
+  items VillageItem[]
+
+  @@map("village")
+}
+
+model VillageItem {
+  id            String   @id @default(uuid())
+  villageId     String   @map("village_id")
+  shopItemId    String   @map("shop_item_id")
+  positionX     Int      @map("position_x")
+  positionY     Int      @map("position_y")
+  buildingLevel Int      @default(1) @map("building_level")
+  placedAt      DateTime @default(now()) @map("placed_at")
+
+  village  Village  @relation(fields: [villageId], references: [id])
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id])
+
+  @@map("village_item")
+}
+
+// ──────────────────────────────────
+// Shop & Inventory
+// ──────────────────────────────────
+enum ShopCategory {
+  building
+  landscape
+  decoration
+}
+
+model ShopItem {
+  id          String       @id @default(uuid())
+  name        String
+  category    ShopCategory
+  price       Int
+  imageUrl    String       @map("image_url")
+  description String
+  unlockLevel Int          @default(1) @map("unlock_level")
+
+  villageItems VillageItem[]
+  inventory    Inventory[]
+
+  @@map("shop_item")
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  shopItemId  String   @map("shop_item_id")
+  quantity    Int
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id])
+
+  @@map("inventory")
+}
