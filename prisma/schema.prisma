@@ -35,10 +35,12 @@ model User {
 // Concept & Concept Relation
 // ──────────────────────────────────
 model Concept {
-  id    Int    @id @default(autoincrement())
-  name  String
-  grade Int
-  order Int
+  id           Int    @id
+  name         String
+  grade        Int
+  semester     Int
+  order        Int
+  knowledgeTag Int?   @map("knowledge_tag")
 
   problems              Problem[]
   prerequisiteRelations ConceptRelation[] @relation("TargetConcept")
