@@ -4,6 +4,8 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
+import { AppleAuthDto } from './dto/apple-auth.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -21,6 +23,18 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Post('google')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  google(@Body() dto: GoogleAuthDto) {
+    return this.auth.googleSignIn(dto.idToken, dto.accessToken);
+  }
+
+  @Post('apple')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  apple(@Body() dto: AppleAuthDto) {
+    return this.auth.appleSignIn(dto);
   }
 
   @Post('refresh')

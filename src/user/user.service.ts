@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../common/constants/user-select';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @Injectable()
 export class UserService {
@@ -17,7 +18,7 @@ export class UserService {
     return user;
   }
 
-  async updateMe(userId: string, data: { name?: string; tutorType?: string }) {
+  async updateMe(userId: string, data: UpdateMeDto) {
     return this.prisma.user.update({
       where: { id: userId },
       data,

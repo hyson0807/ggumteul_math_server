@@ -1,11 +1,14 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,18 +18,210 @@ import {
   USER_WITH_REFRESH_SELECT,
 } from '../common/constants/user-select';
 
+interface GoogleUserInfo {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
+interface AppleUserInfo {
+  sub: string;
+  email?: string;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly accessSecret: string;
   private readonly refreshSecret: string;
+  private readonly googleClient: OAuth2Client;
+  private readonly appleJWKS: ReturnType<typeof createRemoteJWKSet>;
+  private readonly appleBundleId: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
-    config: ConfigService,
+    private readonly config: ConfigService,
   ) {
     this.accessSecret = config.getOrThrow<string>('JWT_ACCESS_SECRET');
     this.refreshSecret = config.getOrThrow<string>('JWT_REFRESH_SECRET');
+    this.googleClient = new OAuth2Client(
+      config.get<string>('GOOGLE_CLIENT_ID'),
+    );
+    this.appleJWKS = createRemoteJWKSet(
+      new URL('https://appleid.apple.com/auth/keys'),
+    );
+    this.appleBundleId = config.get<string>('APPLE_BUNDLE_ID') ?? '';
+  }
+
+  async googleSignIn(idToken?: string, accessToken?: string) {
+    let info: GoogleUserInfo | null = null;
+
+    if (idToken) {
+      try {
+        info = await this.verifyGoogleIdToken(idToken);
+      } catch (e) {
+        this.logger.warn(`Google idToken 검증 실패, accessToken 폴백: ${e}`);
+      }
+    }
+    if (!info && accessToken) {
+      info = await this.fetchGoogleUserInfo(accessToken);
+    }
+    if (!info) {
+      throw new UnauthorizedException('Google 인증에 실패했습니다.');
+    }
+
+    // 1) googleId로 먼저 찾기
+    let user = await this.prisma.user.findUnique({
+      where: { googleId: info.sub },
+      select: USER_PUBLIC_SELECT,
+    });
+
+    // 2) 없으면 email로 찾아서 googleId 연결 (기존 이메일/비밀번호 가입자 지원)
+    if (!user) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: info.email },
+        select: { id: true },
+      });
+      if (existing) {
+        user = await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { googleId: info.sub },
+          select: USER_PUBLIC_SELECT,
+        });
+      }
+    }
+
+    // 3) 그래도 없으면 신규 생성
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          googleId: info.sub,
+          email: info.email,
+          name: info.name ?? null,
+        },
+        select: USER_PUBLIC_SELECT,
+      });
+    }
+
+    const tokens = await this.issueTokens(user.id);
+    return { ...tokens, user };
+  }
+
+  async appleSignIn(dto: {
+    identityToken: string;
+    fullName?: string;
+    email?: string;
+  }) {
+    const apple = await this.verifyAppleToken(dto.identityToken);
+    const resolvedEmail = apple.email ?? dto.email;
+
+    let user = await this.prisma.user.findUnique({
+      where: { appleId: apple.sub },
+      select: USER_PUBLIC_SELECT,
+    });
+
+    if (!user && resolvedEmail) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: resolvedEmail },
+        select: { id: true },
+      });
+      if (existing) {
+        user = await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { appleId: apple.sub },
+          select: USER_PUBLIC_SELECT,
+        });
+      }
+    }
+
+    if (!user) {
+      if (!resolvedEmail) {
+        throw new UnauthorizedException(
+          '최초 Apple 로그인에는 이메일이 필요합니다.',
+        );
+      }
+      user = await this.prisma.user.create({
+        data: {
+          appleId: apple.sub,
+          email: resolvedEmail,
+          name: dto.fullName ?? null,
+        },
+        select: USER_PUBLIC_SELECT,
+      });
+    }
+
+    const tokens = await this.issueTokens(user.id);
+    return { ...tokens, user };
+  }
+
+  private async verifyGoogleIdToken(idToken: string): Promise<GoogleUserInfo> {
+    try {
+      const audiences = [
+        this.config.get<string>('GOOGLE_CLIENT_ID'),
+        this.config.get<string>('GOOGLE_IOS_CLIENT_ID'),
+        this.config.get<string>('GOOGLE_ANDROID_CLIENT_ID'),
+      ].filter(Boolean) as string[];
+
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: audiences,
+      });
+      const payload = ticket.getPayload();
+      if (!payload?.sub || !payload?.email) {
+        throw new Error('Missing user info');
+      }
+      return {
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture,
+      };
+    } catch {
+      throw new UnauthorizedException('유효하지 않은 Google ID 토큰입니다.');
+    }
+  }
+
+  private async fetchGoogleUserInfo(
+    accessToken: string,
+  ): Promise<GoogleUserInfo> {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch user info');
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!data.sub || !data.email) throw new Error('Missing user info');
+      return {
+        sub: data.sub as string,
+        email: data.email as string,
+        name: data.name as string | undefined,
+        picture: data.picture as string | undefined,
+      };
+    } catch {
+      throw new UnauthorizedException(
+        '유효하지 않은 Google access 토큰입니다.',
+      );
+    }
+  }
+
+  private async verifyAppleToken(
+    identityToken: string,
+  ): Promise<AppleUserInfo> {
+    try {
+      const { payload } = await jwtVerify(identityToken, this.appleJWKS, {
+        issuer: 'https://appleid.apple.com',
+        audience: this.appleBundleId,
+      });
+      if (!payload.sub) throw new Error('Missing sub claim');
+      return {
+        sub: payload.sub,
+        email: payload.email as string | undefined,
+      };
+    } catch {
+      throw new UnauthorizedException('유효하지 않은 Apple 토큰입니다.');
+    }
   }
 
   async register(dto: RegisterDto) {
@@ -58,7 +253,7 @@ export class AuthService {
       where: { email: dto.email },
       select: USER_WITH_PASSWORD_SELECT,
     });
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException(
         '이메일 또는 비밀번호가 올바르지 않습니다.',
       );

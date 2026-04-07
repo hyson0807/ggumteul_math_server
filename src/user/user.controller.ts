@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
+import { UpdateMeDto } from './dto/update-me.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -23,7 +24,7 @@ export class UserController {
   @Patch('me')
   updateMe(
     @CurrentUser('sub') userId: string,
-    @Body() data: { name?: string; tutorType?: string },
+    @Body() data: UpdateMeDto,
   ) {
     return this.user.updateMe(userId, data);
   }
