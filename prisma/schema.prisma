@@ -26,9 +26,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  village         Village?
-  learningRecords LearningRecord[]
-  inventory       Inventory[]
+  village          Village?
+  learningRecords  LearningRecord[]
+  inventory        Inventory[]
+  buildingProgress BuildingProgress[]
 
   @@map("user")
 }
@@ -129,6 +130,23 @@ model VillageItem {
   shopItem ShopItem @relation(fields: [shopItemId], references: [id])
 
   @@map("village_item")
+}
+
+// ──────────────────────────────────
+// Building Progress (마을 4개 고정 건물의 레벨/진행도)
+// ──────────────────────────────────
+model BuildingProgress {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // 'house' | 'school' | 'park' | 'shop'
+  level     Int      @default(1)
+  progress  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("building_progress")
 }
 
 // ──────────────────────────────────
