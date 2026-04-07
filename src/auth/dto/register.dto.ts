@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, Matches, IsInt, Min, Max } from 'class-validator';
+import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class RegisterDto {
@@ -12,9 +12,4 @@ export class RegisterDto {
     message: '비밀번호는 문자와 숫자를 모두 포함해야 합니다.',
   })
   password: string;
-
-  @IsInt()
-  @Min(1)
-  @Max(3)
-  grade: number;
 }

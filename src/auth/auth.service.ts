@@ -233,7 +233,6 @@ export class AuthService {
         data: {
           email: dto.email,
           passwordHash,
-          grade: dto.grade,
         },
         select: USER_PUBLIC_SELECT,
       });
