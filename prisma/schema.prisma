@@ -66,15 +66,25 @@ model ConceptRelation {
 // ──────────────────────────────────
 // Problem
 // ──────────────────────────────────
+enum ProblemType {
+  SUBJ
+  MCQ
+}
+
 model Problem {
-  id          String  @id @default(uuid())
-  conceptId   Int     @map("concept_id")
+  id          Int         @id
+  conceptId   Int         @map("concept_id")
+  problemType ProblemType @map("problem_type")
   difficulty  Int
   content     String
-  imageUrl    String? @map("image_url")
+  imageUrl    String?     @map("image_url")
+  choice1     String?     @map("choice_1")
+  choice2     String?     @map("choice_2")
+  choice3     String?     @map("choice_3")
+  choice4     String?     @map("choice_4")
   answer      String
   explanation String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
 
   concept         Concept          @relation(fields: [conceptId], references: [id])
   learningRecords LearningRecord[]
@@ -88,7 +98,7 @@ model Problem {
 model LearningRecord {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
-  problemId   String   @map("problem_id")
+  problemId   Int      @map("problem_id")
   correct     Boolean
   answerGiven String   @map("answer_given")
   timeSpent   Int      @map("time_spent")

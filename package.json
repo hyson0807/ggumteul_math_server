@@ -28,6 +28,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/serve-static": "^5.0.5",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-neon": "^7.5.0",
     "@prisma/client": "^6.19.2",

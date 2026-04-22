@@ -5,7 +5,8 @@ import * as path from 'path';
 const prisma = new PrismaClient();
 
 function parseCsv(filePath: string): Record<string, string>[] {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  let content = fs.readFileSync(filePath, 'utf-8');
+  if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
   const lines = content.trim().split('\n');
   const headers = lines[0].split(',');
 
@@ -82,6 +83,42 @@ async function main() {
     skipDuplicates: true,
   });
   console.log(`  ${relationData.length} concept relations seeded.`);
+
+  // 3. Seed Problems
+  console.log('Seeding problems...');
+  const problems = parseCsv(path.join(seedDataDir, 'problem.csv'));
+
+  const imageDir = path.join(__dirname, '..', 'public', 'problem-images');
+  const imagesOnDisk = new Set(
+    fs.existsSync(imageDir) ? fs.readdirSync(imageDir) : [],
+  );
+
+  const problemData = problems
+    .filter((r) => r['problem_id'] && r['concept_id'])
+    .filter((r) => conceptIds.has(parseInt(r['concept_id'])))
+    .map((r) => {
+      const id = parseInt(r['problem_id']);
+      const hasImage = imagesOnDisk.has(`${id}.png`);
+      return {
+        id,
+        conceptId: parseInt(r['concept_id']),
+        problemType: r['problem_type'] as 'SUBJ' | 'MCQ',
+        difficulty: parseInt(r['difficulty']),
+        content: r['question_text'],
+        imageUrl: hasImage ? `/static/problem-images/${id}.png` : null,
+        choice1: r['choice_1'] || null,
+        choice2: r['choice_2'] || null,
+        choice3: r['choice_3'] || null,
+        choice4: r['choice_4'] || null,
+        answer: r['correct_answer'],
+      };
+    });
+
+  await prisma.problem.createMany({
+    data: problemData,
+    skipDuplicates: true,
+  });
+  console.log(`  ${problemData.length} problems seeded.`);
 
   console.log('Seeding completed!');
 }
