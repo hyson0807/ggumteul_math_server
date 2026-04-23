@@ -120,6 +120,32 @@ async function main() {
   });
   console.log(`  ${problemData.length} problems seeded.`);
 
+  // 4. Seed Shop Items (지렁이 장착 아이템)
+  console.log('Seeding shop items...');
+  const existingShopCount = await prisma.shopItem.count();
+  if (existingShopCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        // 모자 (hat)
+        { name: '풀잎 모자', category: 'hat', price: 30, imageUrl: '/static/shop/hat_leaf.png', description: '풀잎으로 만든 작고 귀여운 모자', unlockStage: 1 },
+        { name: '노란 리본', category: 'hat', price: 60, imageUrl: '/static/shop/hat_ribbon.png', description: '바람에 살랑이는 노란 리본', unlockStage: 2 },
+        { name: '마법사 고깔', category: 'hat', price: 120, imageUrl: '/static/shop/hat_wizard.png', description: '별이 박힌 마법사 고깔모자', unlockStage: 3 },
+        { name: '꽃 화관', category: 'hat', price: 200, imageUrl: '/static/shop/hat_flower.png', description: '봄꽃으로 엮은 화려한 화관', unlockStage: 4 },
+        // 옷 (body)
+        { name: '도토리 갑옷', category: 'body', price: 50, imageUrl: '/static/shop/body_acorn.png', description: '단단한 도토리 껍질로 만든 갑옷', unlockStage: 1 },
+        { name: '꽃무늬 옷', category: 'body', price: 100, imageUrl: '/static/shop/body_floral.png', description: '알록달록 꽃무늬가 수놓인 옷', unlockStage: 2 },
+        { name: '별빛 망토', category: 'body', price: 250, imageUrl: '/static/shop/body_starcloak.png', description: '반짝이는 별빛 무늬의 망토', unlockStage: 4 },
+        // 장신구 (accessory)
+        { name: '이슬 안경', category: 'accessory', price: 40, imageUrl: '/static/shop/acc_dewglass.png', description: '이슬방울로 빚은 투명 안경', unlockStage: 1 },
+        { name: '나뭇잎 가방', category: 'accessory', price: 80, imageUrl: '/static/shop/acc_leafbag.png', description: '넉넉한 나뭇잎 가방', unlockStage: 2 },
+        { name: '반딧불 목걸이', category: 'accessory', price: 180, imageUrl: '/static/shop/acc_firefly.png', description: '어둠 속에서 반짝이는 목걸이', unlockStage: 3 },
+      ],
+    });
+    console.log(`  10 shop items seeded.`);
+  } else {
+    console.log(`  ${existingShopCount} shop items already exist, skipping.`);
+  }
+
   console.log('Seeding completed!');
 }
 

@@ -26,10 +26,19 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  village          Village?
-  learningRecords  LearningRecord[]
-  inventory        Inventory[]
-  buildingProgress BuildingProgress[]
+  wormStage    Int      @default(1) @map("worm_stage")
+  wormProgress Int      @default(0) @map("worm_progress")
+
+  equippedHatId       String? @map("equipped_hat_id")
+  equippedBodyId      String? @map("equipped_body_id")
+  equippedAccessoryId String? @map("equipped_accessory_id")
+
+  equippedHat       ShopItem? @relation("EquippedHat", fields: [equippedHatId], references: [id])
+  equippedBody      ShopItem? @relation("EquippedBody", fields: [equippedBodyId], references: [id])
+  equippedAccessory ShopItem? @relation("EquippedAccessory", fields: [equippedAccessoryId], references: [id])
+
+  learningRecords LearningRecord[]
+  inventory       Inventory[]
 
   @@map("user")
 }
@@ -113,59 +122,12 @@ model LearningRecord {
 }
 
 // ──────────────────────────────────
-// Village & Village Item
-// ──────────────────────────────────
-model Village {
-  id        String   @id @default(uuid())
-  userId    String   @unique @map("user_id")
-  level     Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items VillageItem[]
-
-  @@map("village")
-}
-
-model VillageItem {
-  id            String   @id @default(uuid())
-  villageId     String   @map("village_id")
-  shopItemId    String   @map("shop_item_id")
-  positionX     Int      @map("position_x")
-  positionY     Int      @map("position_y")
-  buildingLevel Int      @default(1) @map("building_level")
-  placedAt      DateTime @default(now()) @map("placed_at")
-
-  village  Village  @relation(fields: [villageId], references: [id], onDelete: Cascade)
-  shopItem ShopItem @relation(fields: [shopItemId], references: [id])
-
-  @@map("village_item")
-}
-
-// ──────────────────────────────────
-// Building Progress (마을 4개 고정 건물의 레벨/진행도)
-// ──────────────────────────────────
-model BuildingProgress {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  type      String   // 'house' | 'school' | 'park' | 'shop'
-  level     Int      @default(1)
-  progress  Int      @default(0)
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, type])
-  @@map("building_progress")
-}
-
-// ──────────────────────────────────
-// Shop & Inventory
+// Shop & Inventory (지렁이 장착 아이템)
 // ──────────────────────────────────
 enum ShopCategory {
-  building
-  landscape
-  decoration
+  hat
+  body
+  accessory
 }
 
 model ShopItem {
@@ -175,10 +137,12 @@ model ShopItem {
   price       Int
   imageUrl    String       @map("image_url")
   description String
-  unlockLevel Int          @default(1) @map("unlock_level")
+  unlockStage Int          @default(1) @map("unlock_stage")
 
-  villageItems VillageItem[]
-  inventory    Inventory[]
+  inventory           Inventory[]
+  equippedByHat       User[]       @relation("EquippedHat")
+  equippedByBody      User[]       @relation("EquippedBody")
+  equippedByAccessory User[]       @relation("EquippedAccessory")
 
   @@map("shop_item")
 }
@@ -187,11 +151,11 @@ model Inventory {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
   shopItemId  String   @map("shop_item_id")
-  quantity    Int
   purchasedAt DateTime @default(now()) @map("purchased_at")
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   shopItem ShopItem @relation(fields: [shopItemId], references: [id])
 
+  @@unique([userId, shopItemId])
   @@map("inventory")
 }

@@ -9,7 +9,9 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { VillageModule } from './village/village.module';
+import { WormModule } from './worm/worm.module';
+import { ShopModule } from './shop/shop.module';
+import { LearningModule } from './learning/learning.module';
 
 @Module({
   imports: [
@@ -22,7 +24,9 @@ import { VillageModule } from './village/village.module';
     PrismaModule,
     AuthModule,
     UserModule,
-    VillageModule,
+    WormModule,
+    ShopModule,
+    LearningModule,
   ],
   controllers: [AppController],
   providers: [

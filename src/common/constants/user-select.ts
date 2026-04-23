@@ -7,6 +7,11 @@ export const USER_PUBLIC_SELECT = {
   coins: true,
   stars: true,
   tutorType: true,
+  wormStage: true,
+  wormProgress: true,
+  equippedHatId: true,
+  equippedBodyId: true,
+  equippedAccessoryId: true,
   createdAt: true,
 } as const;
 
