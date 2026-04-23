@@ -24,6 +24,32 @@ function calcCoinReward(difficulty: number, timeSpent: number) {
   return base + diffBonus + speedBonus;
 }
 
+/**
+ * MCQ의 `problem.answer`는 선택지 번호(1~4)로 저장되어 있으므로
+ * 해당 choice 텍스트로 정규화한다. 프론트는 선택한 choice 텍스트를 그대로 전송.
+ * 인덱스 형태가 아닌 MCQ 또는 주관식은 원본 answer 텍스트를 그대로 사용.
+ */
+function resolveCorrectAnswer(problem: {
+  problemType: 'SUBJ' | 'MCQ';
+  answer: string;
+  choice1: string | null;
+  choice2: string | null;
+  choice3: string | null;
+  choice4: string | null;
+}): string {
+  const raw = problem.answer.trim();
+  if (problem.problemType !== 'MCQ') return raw;
+  const idx = Number.parseInt(raw, 10);
+  if (!Number.isFinite(idx) || idx < 1 || idx > 4) return raw;
+  const choices = [
+    problem.choice1,
+    problem.choice2,
+    problem.choice3,
+    problem.choice4,
+  ];
+  return choices[idx - 1]?.trim() ?? raw;
+}
+
 @Injectable()
 export class LearningService {
   constructor(private readonly prisma: PrismaService) {}
@@ -206,7 +232,12 @@ export class LearningService {
         id: true,
         conceptId: true,
         difficulty: true,
+        problemType: true,
         answer: true,
+        choice1: true,
+        choice2: true,
+        choice3: true,
+        choice4: true,
         explanation: true,
         concept: { select: { grade: true, semester: true } },
       },
@@ -218,7 +249,8 @@ export class LearningService {
       problem.concept.semester,
     );
     const givenAnswer = dto.answer.trim();
-    const correct = givenAnswer === problem.answer.trim();
+    const correctAnswerText = resolveCorrectAnswer(problem);
+    const correct = givenAnswer === correctAnswerText;
     const coinsEarned = correct
       ? calcCoinReward(problem.difficulty, dto.timeSpent)
       : 0;
@@ -316,7 +348,7 @@ export class LearningService {
         starsEarned,
         nodeNewlyCleared,
         stageNewlyCleared,
-        correctAnswer: problem.answer,
+        correctAnswer: correctAnswerText,
         explanation: problem.explanation,
         user: updatedUser,
       };
