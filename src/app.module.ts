@@ -12,6 +12,7 @@ import { UserModule } from './user/user.module';
 import { WormModule } from './worm/worm.module';
 import { ShopModule } from './shop/shop.module';
 import { LearningModule } from './learning/learning.module';
+import { AppMetaModule } from './app-meta/app-meta.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { LearningModule } from './learning/learning.module';
     WormModule,
     ShopModule,
     LearningModule,
+    AppMetaModule,
   ],
   controllers: [AppController],
   providers: [
