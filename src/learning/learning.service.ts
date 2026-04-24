@@ -11,7 +11,6 @@ import {
 } from '../common/constants/learning-select';
 import {
   MAX_WORM_STAGE,
-  NODE_CLEAR_THRESHOLD,
   WORM_STAGES,
   stageToSemester,
   semesterToStage,
@@ -62,7 +61,12 @@ export class LearningService {
       }),
       this.prisma.concept.findMany({
         where: { problems: { some: {} } },
-        select: { id: true, grade: true, semester: true },
+        select: {
+          id: true,
+          grade: true,
+          semester: true,
+          _count: { select: { problems: true } },
+        },
       }),
       this.countClearedByConcept(userId),
     ]);
@@ -73,7 +77,8 @@ export class LearningService {
     for (const c of playableConcepts) {
       const stage = semesterToStage(c.grade, c.semester);
       totalByStage.set(stage, (totalByStage.get(stage) ?? 0) + 1);
-      if ((clearedCounts.get(c.id) ?? 0) >= NODE_CLEAR_THRESHOLD) {
+      const solvedCount = clearedCounts.get(c.id) ?? 0;
+      if (c._count.problems > 0 && solvedCount >= c._count.problems) {
         clearedByStage.set(stage, (clearedByStage.get(stage) ?? 0) + 1);
       }
     }
@@ -128,10 +133,11 @@ export class LearningService {
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
     const stageLocked = stage > user.wormStage;
-    const playableIds = concepts
-      .filter((c) => c._count.problems > 0)
-      .map((c) => c.id);
-    const clearedSet = await this.getClearedConceptSet(userId, playableIds);
+    const playableTotals = new Map<number, number>();
+    for (const c of concepts) {
+      if (c._count.problems > 0) playableTotals.set(c.id, c._count.problems);
+    }
+    const clearedSet = await this.getClearedConceptSet(userId, playableTotals);
 
     // 선형 잠금: 첫 번째 미클리어 플레이가능 노드 = 활성, 그 뒤 플레이가능 노드 = 잠금
     let firstUnclearedSeen = false;
@@ -169,7 +175,7 @@ export class LearningService {
       grade,
       semester,
       stageLocked,
-      totalNodes: playableIds.length,
+      totalNodes: playableTotals.size,
       clearedNodes: clearedSet.size,
       nodes,
     };
@@ -217,8 +223,8 @@ export class LearningService {
         ...p,
         solved: solvedProblemIds.has(p.id),
       })),
-      clearThreshold: NODE_CLEAR_THRESHOLD,
-      cleared: solvedProblemIds.size >= NODE_CLEAR_THRESHOLD,
+      clearThreshold: problems.length,
+      cleared: problems.length > 0 && solvedProblemIds.size >= problems.length,
     };
   }
 
@@ -265,6 +271,9 @@ export class LearningService {
           },
         })
       : Promise.resolve(0);
+    const totalProblemsInConceptPromise = correct
+      ? this.prisma.problem.count({ where: { conceptId: problem.conceptId } })
+      : Promise.resolve(0);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
@@ -309,11 +318,13 @@ export class LearningService {
         },
       });
 
+      const totalProblemsInConcept = await totalProblemsInConceptPromise;
       const nodeNewlyCleared =
         correct &&
         !alreadyCorrectOnThisProblem &&
-        priorUniqueCorrect < NODE_CLEAR_THRESHOLD &&
-        priorUniqueCorrect + 1 >= NODE_CLEAR_THRESHOLD;
+        totalProblemsInConcept > 0 &&
+        priorUniqueCorrect < totalProblemsInConcept &&
+        priorUniqueCorrect + 1 >= totalProblemsInConcept;
 
       let nextStage = user.wormStage;
       let nextProgress = user.wormProgress;
@@ -358,10 +369,6 @@ export class LearningService {
     return result;
   }
 
-  /**
-   * 사용자가 각 concept에서 맞춘 고유 정답 문제 수. 클리어 임계값 판정용.
-   * problem → concept 조인을 한 번에 수행하기 위해 select nested를 사용.
-   */
   private async countClearedByConcept(
     userId: string,
     conceptIds?: number[],
@@ -384,12 +391,17 @@ export class LearningService {
     return counts;
   }
 
-  private async getClearedConceptSet(userId: string, conceptIds: number[]) {
-    if (conceptIds.length === 0) return new Set<number>();
-    const counts = await this.countClearedByConcept(userId, conceptIds);
+  private async getClearedConceptSet(
+    userId: string,
+    conceptTotals: Map<number, number>,
+  ) {
+    if (conceptTotals.size === 0) return new Set<number>();
+    const counts = await this.countClearedByConcept(userId, [
+      ...conceptTotals.keys(),
+    ]);
     const cleared = new Set<number>();
-    for (const [cid, cnt] of counts) {
-      if (cnt >= NODE_CLEAR_THRESHOLD) cleared.add(cid);
+    for (const [id, total] of conceptTotals) {
+      if (total > 0 && (counts.get(id) ?? 0) >= total) cleared.add(id);
     }
     return cleared;
   }

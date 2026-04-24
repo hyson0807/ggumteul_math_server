@@ -42,6 +42,3 @@ export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 export function isEquipSlot(value: string): value is EquipSlot {
   return (EQUIP_SLOTS as readonly string[]).includes(value);
 }
-
-/** 노드 클리어 판정: 해당 concept의 고유 정답 문제 수 기준 */
-export const NODE_CLEAR_THRESHOLD = 2;
