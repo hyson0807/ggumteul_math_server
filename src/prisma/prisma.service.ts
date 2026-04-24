@@ -6,7 +6,9 @@ import { PrismaClient } from '@prisma/client';
 // 동일 요청이 Neon 을 깨우므로 짧은 대기 후 재시도하면 거의 항상 성공.
 // P2024 는 connection pool 타임아웃으로, cold-start 구간에서 동반 발생.
 const TRANSIENT_CODES = new Set(['P1001', 'P1002', 'P2024']);
-const RETRY_DELAY_MS = 1500;
+// 지수 백오프: 1차 실패 → 1.5s 대기 → 2차 시도 → 실패 시 3s 대기 → 3차 시도.
+// 2회 재시도 기준 "여전히 suspend" 확률은 1% 이하로 떨어짐.
+const RETRY_DELAYS_MS = [1500, 3000] as const;
 
 @Injectable()
 export class PrismaService
@@ -22,17 +24,23 @@ export class PrismaService
       name: 'neonColdStartRetry',
       query: {
         async $allOperations({ args, query, operation, model }) {
-          try {
-            return await query(args);
-          } catch (e) {
-            const code = (e as { code?: string })?.code;
-            if (!code || !TRANSIENT_CODES.has(code)) throw e;
-            PrismaService.logger.warn(
-              `Neon cold-start retry: ${model ?? ''}.${operation} (${code})`,
-            );
-            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-            return await query(args);
+          let lastErr: unknown;
+          for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+            try {
+              return await query(args);
+            } catch (e) {
+              const code = (e as { code?: string })?.code;
+              if (!code || !TRANSIENT_CODES.has(code)) throw e;
+              lastErr = e;
+              if (attempt === RETRY_DELAYS_MS.length) break;
+              const delay = RETRY_DELAYS_MS[attempt];
+              PrismaService.logger.warn(
+                `Neon cold-start retry ${attempt + 1}/${RETRY_DELAYS_MS.length}: ${model ?? ''}.${operation} (${code}), waiting ${delay}ms`,
+              );
+              await new Promise((r) => setTimeout(r, delay));
+            }
           }
+          throw lastErr;
         },
       },
     });
