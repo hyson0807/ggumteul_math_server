@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────
+// User
+// ──────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?  @map("password_hash")
+  googleId     String?  @unique @map("google_id")
+  appleId      String?  @unique @map("apple_id")
+  name         String?
+  grade        Int?
+  level        Int      @default(1)
+  coins        Int      @default(0)
+  stars        Int      @default(0)
+  tutorType    String?  @map("tutor_type")
+  refreshToken String?  @map("refresh_token")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  wormStage    Int      @default(1) @map("worm_stage")
+  wormProgress Int      @default(0) @map("worm_progress")
+
+  equippedHatId       String? @map("equipped_hat_id")
+  equippedBodyId      String? @map("equipped_body_id")
+  equippedAccessoryId String? @map("equipped_accessory_id")
+
+  equippedHat       ShopItem? @relation("EquippedHat", fields: [equippedHatId], references: [id])
+  equippedBody      ShopItem? @relation("EquippedBody", fields: [equippedBodyId], references: [id])
+  equippedAccessory ShopItem? @relation("EquippedAccessory", fields: [equippedAccessoryId], references: [id])
+
+  learningRecords LearningRecord[]
+  inventory       Inventory[]
+
+  @@map("user")
+}
+
+// ──────────────────────────────────
+// Concept & Concept Relation
+// ──────────────────────────────────
+model Concept {
+  id           Int    @id
+  name         String
+  grade        Int
+  semester     Int
+  order        Int
+  knowledgeTag Int?   @map("knowledge_tag")
+
+  problems              Problem[]
+  prerequisiteRelations ConceptRelation[] @relation("TargetConcept")
+  targetRelations       ConceptRelation[] @relation("PrerequisiteConcept")
+
+  @@map("concept")
+}
+
+model ConceptRelation {
+  id                    Int @id @default(autoincrement())
+  prerequisiteConceptId Int @map("prerequisite_concept_id")
+  targetConceptId       Int @map("target_concept_id")
+
+  prerequisiteConcept Concept @relation("PrerequisiteConcept", fields: [prerequisiteConceptId], references: [id])
+  targetConcept       Concept @relation("TargetConcept", fields: [targetConceptId], references: [id])
+
+  @@map("concept_relation")
+}
+
+// ──────────────────────────────────
+// Problem
+// ──────────────────────────────────
+enum ProblemType {
+  SUBJ
+  MCQ
+}
+
+model Problem {
+  id          Int         @id
+  conceptId   Int         @map("concept_id")
+  problemType ProblemType @map("problem_type")
+  difficulty  Int
+  content     String
+  imageUrl    String?     @map("image_url")
+  choice1     String?     @map("choice_1")
+  choice2     String?     @map("choice_2")
+  choice3     String?     @map("choice_3")
+  choice4     String?     @map("choice_4")
+  answer      String
+  explanation String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  concept         Concept          @relation(fields: [conceptId], references: [id])
+  learningRecords LearningRecord[]
+
+  @@map("problem")
+}
+
+// ──────────────────────────────────
+// Learning Record
+// ──────────────────────────────────
+model LearningRecord {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  problemId   Int      @map("problem_id")
+  correct     Boolean
+  answerGiven String   @map("answer_given")
+  timeSpent   Int      @map("time_spent")
+  coinsEarned Int      @map("coins_earned")
+  starsEarned Int      @map("stars_earned")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id])
+
+  @@map("learning_record")
+}
+
+// ──────────────────────────────────
+// Shop & Inventory (지렁이 장착 아이템)
+// ──────────────────────────────────
+enum ShopCategory {
+  hat
+  body
+  accessory
+}
+
+model ShopItem {
+  id          String       @id @default(uuid())
+  name        String
+  category    ShopCategory
+  price       Int
+  imageUrl    String       @map("image_url")
+  description String
+  unlockStage Int          @default(1) @map("unlock_stage")
+
+  inventory           Inventory[]
+  equippedByHat       User[]       @relation("EquippedHat")
+  equippedByBody      User[]       @relation("EquippedBody")
+  equippedByAccessory User[]       @relation("EquippedAccessory")
+
+  @@map("shop_item")
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  shopItemId  String   @map("shop_item_id")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id])
+
+  @@unique([userId, shopItemId])
+  @@map("inventory")
+}
