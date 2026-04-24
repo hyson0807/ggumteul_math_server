@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -13,6 +13,7 @@ import { WormModule } from './worm/worm.module';
 import { ShopModule } from './shop/shop.module';
 import { LearningModule } from './learning/learning.module';
 import { AppMetaModule } from './app-meta/app-meta.module';
+import { PrismaRetryInterceptor } from './common/interceptors/prisma-retry.interceptor';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AppMetaModule } from './app-meta/app-meta.module';
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: PrismaRetryInterceptor },
   ],
 })
 export class AppModule {}
