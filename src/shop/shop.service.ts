@@ -93,35 +93,32 @@ export class ShopService {
 
       const user = await tx.user.findUnique({
         where: { id: userId },
-        select: { coins: true, wormStage: true },
+        select: { wormStage: true },
       });
       if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
       if (user.wormStage < item.unlockStage) {
         throw new ForbiddenException('아직 잠금 해제되지 않은 아이템입니다.');
       }
-      if (user.coins < item.price) {
-        throw new BadRequestException('코인이 부족합니다.');
-      }
 
       try {
         const [updatedUser] = await Promise.all([
           tx.user.update({
-            where: { id: userId },
+            where: { id: userId, coins: { gte: item.price } },
             data: { coins: { decrement: item.price } },
             select: USER_PUBLIC_SELECT,
           }),
-          tx.inventory.create({
-            data: { userId, shopItemId },
-          }),
+          tx.inventory.create({ data: { userId, shopItemId } }),
         ]);
         return { user: updatedUser };
       } catch (e) {
-        if (
-          e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
-        ) {
-          throw new ConflictException('이미 보유한 아이템입니다.');
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+          if (e.code === 'P2025') {
+            throw new BadRequestException('코인이 부족합니다.');
+          }
+          if (e.code === 'P2002') {
+            throw new ConflictException('이미 보유한 아이템입니다.');
+          }
         }
         throw e;
       }

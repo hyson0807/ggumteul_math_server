@@ -19,7 +19,7 @@ import { AppMetaModule } from './app-meta/app-meta.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', '..', 'public'),
+      rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/static',
     }),
     PrismaModule,

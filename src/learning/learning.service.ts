@@ -255,8 +255,7 @@ export class LearningService {
       ? calcCoinReward(problem.difficulty, dto.timeSpent)
       : 0;
 
-    // 노드 클리어 판정 시 필요한 "스테이지 내 플레이가능 노드 수"는 정적 데이터이므로
-    // 트랜잭션 락 밖에서 먼저 계산한다.
+    // 정적 데이터이므로 트랜잭션 락 밖에서 미리 조회
     const totalNodesPromise = correct
       ? this.prisma.concept.count({
           where: {
@@ -323,10 +322,12 @@ export class LearningService {
       if (nodeNewlyCleared) {
         nextProgress = user.wormProgress + 1;
         const totalNodes = await totalNodesPromise;
-        if (nextProgress >= totalNodes && nextStage < MAX_WORM_STAGE) {
-          nextStage += 1;
-          nextProgress = 0;
+        if (nextProgress >= totalNodes) {
           stageNewlyCleared = true;
+          nextProgress = 0;
+          if (nextStage < MAX_WORM_STAGE) {
+            nextStage += 1;
+          }
         }
       }
 
