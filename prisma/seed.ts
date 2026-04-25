@@ -98,14 +98,16 @@ async function main() {
     .filter((r) => conceptIds.has(parseInt(r['concept_id'])))
     .map((r) => {
       const id = parseInt(r['problem_id']);
-      const hasImage = imagesOnDisk.has(`${id}.png`);
+      const imageFile = ['png', 'jpeg', 'jpg'].find((ext) =>
+        imagesOnDisk.has(`${id}.${ext}`),
+      );
       return {
         id,
         conceptId: parseInt(r['concept_id']),
         problemType: r['problem_type'] as 'SUBJ' | 'MCQ',
         difficulty: parseInt(r['difficulty']),
         content: r['question_text'],
-        imageUrl: hasImage ? `/static/problem-images/${id}.png` : null,
+        imageUrl: imageFile ? `/static/problem-images/${id}.${imageFile}` : null,
         choice1: r['choice_1'] || null,
         choice2: r['choice_2'] || null,
         choice3: r['choice_3'] || null,
