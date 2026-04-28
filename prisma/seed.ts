@@ -106,7 +106,7 @@ async function main() {
         conceptId: parseInt(r['concept_id']),
         problemType: r['problem_type'] as 'SUBJ' | 'MCQ',
         difficulty: parseInt(r['difficulty']),
-        content: r['question_text'],
+        content: r['question_text'].replace(/\\n/g, '\n'),
         imageUrl: imageFile ? `/static/problem-images/${id}.${imageFile}` : null,
         choice1: r['choice_1'] || null,
         choice2: r['choice_2'] || null,
