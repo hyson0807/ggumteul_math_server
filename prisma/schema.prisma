@@ -21,7 +21,6 @@ model User {
   level        Int      @default(1)
   coins        Int      @default(0)
   stars        Int      @default(0)
-  tutorType    String?  @map("tutor_type")
   refreshToken String?  @map("refresh_token")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

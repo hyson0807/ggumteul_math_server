@@ -6,7 +6,6 @@ export const USER_PUBLIC_SELECT = {
   level: true,
   coins: true,
   stars: true,
-  tutorType: true,
   wormStage: true,
   wormProgress: true,
   equippedHatId: true,
