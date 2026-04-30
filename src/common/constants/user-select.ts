@@ -13,6 +13,9 @@ export const USER_PUBLIC_SELECT = {
   equippedBodyId: true,
   equippedAccessoryId: true,
   createdAt: true,
+  diagnosticCompletedAt: true,
+  diagnosticScore: true,
+  diagnosticGrade: true,
 } as const;
 
 export const USER_WITH_PASSWORD_SELECT = {

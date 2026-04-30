@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { LearningService } from './learning.service';
 import { SubmitAnswerDto } from './dto/submit-answer.dto';
+import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 
 @Controller('learning')
 @UseGuards(JwtAuthGuard)
@@ -41,5 +42,23 @@ export class LearningController {
   @Post('submit')
   submit(@CurrentUser('sub') userId: string, @Body() dto: SubmitAnswerDto) {
     return this.learning.submitAnswer(userId, dto);
+  }
+
+  @Get('diagnostic/result')
+  getDiagnosticResult(@CurrentUser('sub') userId: string) {
+    return this.learning.getDiagnosticResult(userId);
+  }
+
+  @Get('diagnostic/:grade')
+  getDiagnostic(@Param('grade', ParseIntPipe) grade: number) {
+    return this.learning.getDiagnostic(grade);
+  }
+
+  @Post('diagnostic/complete')
+  completeDiagnostic(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: CompleteDiagnosticDto,
+  ) {
+    return this.learning.completeDiagnostic(userId, dto);
   }
 }

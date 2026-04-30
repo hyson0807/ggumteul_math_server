@@ -33,6 +33,10 @@ model User {
   equippedBodyId      String? @map("equipped_body_id")
   equippedAccessoryId String? @map("equipped_accessory_id")
 
+  diagnosticCompletedAt DateTime? @map("diagnostic_completed_at")
+  diagnosticScore       Int?      @map("diagnostic_score")
+  diagnosticGrade       Int?      @map("diagnostic_grade")
+
   equippedHat       ShopItem? @relation("EquippedHat", fields: [equippedHatId], references: [id])
   equippedBody      ShopItem? @relation("EquippedBody", fields: [equippedBodyId], references: [id])
   equippedAccessory ShopItem? @relation("EquippedAccessory", fields: [equippedAccessoryId], references: [id])

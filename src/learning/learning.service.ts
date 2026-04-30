@@ -15,6 +15,11 @@ import {
   stageToSemester,
   semesterToStage,
 } from '../common/constants/worm';
+import {
+  DIAGNOSTIC_PID_MIN,
+  getDiagnosticIds,
+} from '../common/constants/diagnostic';
+import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 
 function calcCoinReward(difficulty: number, timeSpent: number) {
   const base = 10;
@@ -60,12 +65,16 @@ export class LearningService {
         select: { wormStage: true, wormProgress: true },
       }),
       this.prisma.concept.findMany({
-        where: { problems: { some: {} } },
+        where: { problems: { some: { id: { lt: DIAGNOSTIC_PID_MIN } } } },
         select: {
           id: true,
           grade: true,
           semester: true,
-          _count: { select: { problems: true } },
+          _count: {
+            select: {
+              problems: { where: { id: { lt: DIAGNOSTIC_PID_MIN } } },
+            },
+          },
         },
       }),
       this.countClearedByConcept(userId),
@@ -126,7 +135,11 @@ export class LearningService {
         orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: {
           ...CONCEPT_NODE_SELECT,
-          _count: { select: { problems: true } },
+          _count: {
+            select: {
+              problems: { where: { id: { lt: DIAGNOSTIC_PID_MIN } } },
+            },
+          },
         },
       }),
     ]);
@@ -192,12 +205,17 @@ export class LearningService {
         select: { wormStage: true },
       }),
       this.prisma.problem.findMany({
-        where: { conceptId },
+        where: { conceptId, id: { lt: DIAGNOSTIC_PID_MIN } },
         orderBy: [{ difficulty: 'asc' }, { id: 'asc' }],
         select: PROBLEM_PUBLIC_SELECT,
       }),
       this.prisma.learningRecord.findMany({
-        where: { userId, correct: true, problem: { conceptId } },
+        where: {
+          userId,
+          correct: true,
+          problemId: { lt: DIAGNOSTIC_PID_MIN },
+          problem: { conceptId },
+        },
         select: { problemId: true },
         distinct: ['problemId'],
       }),
@@ -232,6 +250,11 @@ export class LearningService {
     userId: string,
     dto: { problemId: number; answer: string; timeSpent: number },
   ) {
+    if (dto.problemId >= DIAGNOSTIC_PID_MIN) {
+      throw new BadRequestException(
+        '진단평가 문제는 이 엔드포인트로 풀 수 없습니다.',
+      );
+    }
     const problem = await this.prisma.problem.findUnique({
       where: { id: dto.problemId },
       select: {
@@ -272,7 +295,12 @@ export class LearningService {
         })
       : Promise.resolve(0);
     const totalProblemsInConceptPromise = correct
-      ? this.prisma.problem.count({ where: { conceptId: problem.conceptId } })
+      ? this.prisma.problem.count({
+          where: {
+            conceptId: problem.conceptId,
+            id: { lt: DIAGNOSTIC_PID_MIN },
+          },
+        })
       : Promise.resolve(0);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -296,6 +324,7 @@ export class LearningService {
         where: {
           userId,
           correct: true,
+          problemId: { lt: DIAGNOSTIC_PID_MIN },
           problem: { conceptId: problem.conceptId },
         },
         select: { problemId: true },
@@ -369,6 +398,173 @@ export class LearningService {
     return result;
   }
 
+  async getDiagnostic(grade: number) {
+    const ids = getDiagnosticIds(grade);
+    if (!ids) throw new BadRequestException('유효하지 않은 학년입니다.');
+
+    const problems = await this.prisma.problem.findMany({
+      where: { id: { in: ids } },
+      select: PROBLEM_PUBLIC_SELECT,
+    });
+    const byId = new Map(problems.map((p) => [p.id, p]));
+    return ids.map((id) => byId.get(id)).filter((p) => p !== undefined);
+  }
+
+  async completeDiagnostic(userId: string, dto: CompleteDiagnosticDto) {
+    const ids = getDiagnosticIds(dto.grade);
+    if (!ids) throw new BadRequestException('유효하지 않은 학년입니다.');
+
+    const expected = new Set(ids);
+    const submitted = new Set(dto.answers.map((a) => a.problemId));
+    if (
+      submitted.size !== expected.size ||
+      ids.some((id) => !submitted.has(id))
+    ) {
+      throw new BadRequestException(
+        '제출된 문제 ID 가 진단평가 문제 집합과 일치하지 않습니다.',
+      );
+    }
+
+    // idempotent gate 와 채점용 problem 조회는 독립적이므로 병렬.
+    const [gateUser, problems] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          diagnosticCompletedAt: true,
+          diagnosticScore: true,
+        },
+      }),
+      this.prisma.problem.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          problemType: true,
+          answer: true,
+          choice1: true,
+          choice2: true,
+          choice3: true,
+          choice4: true,
+        },
+      }),
+    ]);
+    if (!gateUser) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    if (gateUser.diagnosticCompletedAt) {
+      // 이미 완료 — 기존 결과만 그대로 반환 (LR 중복 생성 X). 전체 user 응답은 별도 조회.
+      const fullUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: USER_PUBLIC_SELECT,
+      });
+      return { user: fullUser!, score: gateUser.diagnosticScore ?? 0 };
+    }
+
+    const problemById = new Map(problems.map((p) => [p.id, p]));
+    const records = dto.answers.map((a) => {
+      const problem = problemById.get(a.problemId);
+      if (!problem) {
+        throw new BadRequestException(
+          `문제 ${a.problemId} 를 찾을 수 없습니다.`,
+        );
+      }
+      const correctText = resolveCorrectAnswer(problem);
+      const givenAnswer = a.answer.trim();
+      return {
+        userId,
+        problemId: a.problemId,
+        correct: givenAnswer === correctText,
+        answerGiven: givenAnswer,
+        timeSpent: a.timeSpent ?? 0,
+        coinsEarned: 0,
+        starsEarned: 0,
+      };
+    });
+    const correctCount = records.filter((r) => r.correct).length;
+
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      await tx.learningRecord.createMany({ data: records });
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          diagnosticCompletedAt: new Date(),
+          diagnosticScore: correctCount,
+          diagnosticGrade: dto.grade,
+        },
+        select: USER_PUBLIC_SELECT,
+      });
+    });
+
+    return { user: updatedUser, score: correctCount };
+  }
+
+  async getDiagnosticResult(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        diagnosticCompletedAt: true,
+        diagnosticScore: true,
+        diagnosticGrade: true,
+      },
+    });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    if (!user.diagnosticCompletedAt || !user.diagnosticGrade) {
+      throw new NotFoundException('아직 진단평가를 완료하지 않았습니다.');
+    }
+
+    const ids = getDiagnosticIds(user.diagnosticGrade) ?? [];
+    const records = await this.prisma.learningRecord.findMany({
+      where: { userId, problemId: { in: ids } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        problemId: true,
+        correct: true,
+        answerGiven: true,
+        timeSpent: true,
+        problem: {
+          select: {
+            id: true,
+            problemType: true,
+            content: true,
+            imageUrl: true,
+            choice1: true,
+            choice2: true,
+            choice3: true,
+            choice4: true,
+            answer: true,
+            explanation: true,
+            concept: { select: { name: true, grade: true } },
+          },
+        },
+      },
+    });
+
+    const recordByPid = new Map(records.map((r) => [r.problemId, r]));
+    const items = ids
+      .map((pid) => recordByPid.get(pid))
+      .filter((r): r is NonNullable<typeof r> => r !== undefined)
+      .map((r) => ({
+        problemId: r.problemId,
+        problemType: r.problem.problemType,
+        content: r.problem.content,
+        imageUrl: r.problem.imageUrl,
+        choice1: r.problem.choice1,
+        choice2: r.problem.choice2,
+        choice3: r.problem.choice3,
+        choice4: r.problem.choice4,
+        conceptName: r.problem.concept.name,
+        myAnswer: r.answerGiven,
+        correctAnswer: resolveCorrectAnswer(r.problem),
+        correct: r.correct,
+        explanation: r.problem.explanation,
+      }));
+
+    return {
+      score: user.diagnosticScore ?? 0,
+      grade: user.diagnosticGrade,
+      completedAt: user.diagnosticCompletedAt,
+      items,
+    };
+  }
+
   private async countClearedByConcept(
     userId: string,
     conceptIds?: number[],
@@ -377,6 +573,7 @@ export class LearningService {
       where: {
         userId,
         correct: true,
+        problemId: { lt: DIAGNOSTIC_PID_MIN },
         ...(conceptIds && { problem: { conceptId: { in: conceptIds } } }),
       },
       select: { problemId: true, problem: { select: { conceptId: true } } },
