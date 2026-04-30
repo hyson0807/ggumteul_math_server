@@ -148,6 +148,40 @@ async function main() {
     console.log(`  ${existingShopCount} shop items already exist, skipping.`);
   }
 
+  // 5. Seed Diagnostic Problems (PID 10001~)
+  console.log('Seeding diagnostic problems...');
+  const diagnostics = parseCsv(path.join(seedDataDir, 'diagnostic.csv'));
+
+  const diagnosticData = diagnostics
+    .filter((r) => r['id'] && r['concept_id'])
+    .filter((r) => conceptIds.has(parseInt(r['concept_id'])))
+    .map((r) => {
+      const id = parseInt(r['id']);
+      const imageFile = ['png', 'jpeg', 'jpg'].find((ext) =>
+        imagesOnDisk.has(`${id}.${ext}`),
+      );
+      return {
+        id,
+        conceptId: parseInt(r['concept_id']),
+        problemType: r['problem_type'] as 'SUBJ' | 'MCQ',
+        difficulty: parseInt(r['difficulty']),
+        content: r['content'].replace(/\\n/g, '\n'),
+        imageUrl: imageFile ? `/static/problem-images/${id}.${imageFile}` : null,
+        choice1: r['choice_1'] || null,
+        choice2: r['choice_2'] || null,
+        choice3: r['choice_3'] || null,
+        choice4: r['choice_4'] || null,
+        answer: r['answer'],
+        explanation: r['explanation'] || null,
+      };
+    });
+
+  await prisma.problem.createMany({
+    data: diagnosticData,
+    skipDuplicates: true,
+  });
+  console.log(`  ${diagnosticData.length} diagnostic problems seeded.`);
+
   console.log('Seeding completed!');
 }
 
