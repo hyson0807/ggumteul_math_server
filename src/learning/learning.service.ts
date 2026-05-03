@@ -58,9 +58,12 @@ function resolveCorrectAnswer(problem: {
 
 @Injectable()
 export class LearningService {
-  // 우리 커리큘럼의 knowledgeTag 목록 (DKT restrict_to_tags 용).
+  // 우리 커리큘럼의 (knowledgeTag, grade) 목록 (DKT restrict_to_tags 용).
+  // 진단평가 프로파일에서 사용자 학년 이하 영역만 추출하기 위해 grade 도 함께 캐싱.
   // 시드는 부팅 후 변경되지 않으므로 첫 호출 시 1회만 로드.
-  private cachedConceptTags: number[] | null = null;
+  private cachedConceptTagsWithGrade:
+    | { tag: number; grade: number }[]
+    | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -576,8 +579,8 @@ export class LearningService {
 
   async getDiagnosticProfile(userId: string) {
     // 진단평가는 학년당 1회 idempotent 라 사용자별 record 는 단일 학년 (10개) 만 존재.
-    // user 검증·records·캐시된 tag 목록은 서로 의존성 없어 병렬 fetch.
-    const [user, records, restrictToTags] = await Promise.all([
+    // user 검증·records·캐시된 tag 풀은 서로 의존성 없어 병렬 fetch.
+    const [user, records, allTagsWithGrade] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -595,7 +598,7 @@ export class LearningService {
           },
         },
       }),
-      this.getCachedConceptTags(),
+      this.getCachedConceptTagsWithGrade(),
     ]);
 
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
@@ -616,6 +619,11 @@ export class LearningService {
         '진단평가 데이터를 분석 입력으로 변환할 수 없습니다.',
       );
     }
+
+    // 사용자 학년 이하 영역으로 제한 — 아직 안 배운 학년의 강·약점은 의미 X
+    const restrictToTags = allTagsWithGrade
+      .filter((c) => c.grade <= user.diagnosticGrade!)
+      .map((c) => c.tag);
 
     const dkt = await this.dkt.predict({
       studentId: userId,
@@ -668,16 +676,23 @@ export class LearningService {
     };
   }
 
-  private async getCachedConceptTags(): Promise<number[]> {
-    if (this.cachedConceptTags) return this.cachedConceptTags;
+  private async getCachedConceptTagsWithGrade(): Promise<
+    { tag: number; grade: number }[]
+  > {
+    if (this.cachedConceptTagsWithGrade) {
+      return this.cachedConceptTagsWithGrade;
+    }
     const concepts = await this.prisma.concept.findMany({
       where: { knowledgeTag: { not: null } },
-      select: { knowledgeTag: true },
+      select: { knowledgeTag: true, grade: true },
     });
-    this.cachedConceptTags = concepts
-      .map((c) => c.knowledgeTag)
-      .filter((t): t is number => t !== null);
-    return this.cachedConceptTags;
+    this.cachedConceptTagsWithGrade = concepts
+      .filter(
+        (c): c is { knowledgeTag: number; grade: number } =>
+          c.knowledgeTag !== null,
+      )
+      .map((c) => ({ tag: c.knowledgeTag, grade: c.grade }));
+    return this.cachedConceptTagsWithGrade;
   }
 
   private async countClearedByConcept(
