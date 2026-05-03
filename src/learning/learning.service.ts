@@ -575,29 +575,33 @@ export class LearningService {
   }
 
   async getDiagnosticProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        diagnosticCompletedAt: true,
-        diagnosticGrade: true,
-      },
-    });
+    // 진단평가는 학년당 1회 idempotent 라 사용자별 record 는 단일 학년 (10개) 만 존재.
+    // user 검증·records·캐시된 tag 목록은 서로 의존성 없어 병렬 fetch.
+    const [user, records, restrictToTags] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          diagnosticCompletedAt: true,
+          diagnosticGrade: true,
+        },
+      }),
+      this.prisma.learningRecord.findMany({
+        where: { userId, problemId: { gte: DIAGNOSTIC_PID_MIN } },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          correct: true,
+          problem: {
+            select: { concept: { select: { knowledgeTag: true } } },
+          },
+        },
+      }),
+      this.getCachedConceptTags(),
+    ]);
+
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
     if (!user.diagnosticCompletedAt || !user.diagnosticGrade) {
       throw new NotFoundException('아직 진단평가를 완료하지 않았습니다.');
     }
-
-    const ids = getDiagnosticIds(user.diagnosticGrade) ?? [];
-    const records = await this.prisma.learningRecord.findMany({
-      where: { userId, problemId: { in: ids } },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        correct: true,
-        problem: {
-          select: { concept: { select: { knowledgeTag: true } } },
-        },
-      },
-    });
 
     const knowledgeTags: number[] = [];
     const corrects: (0 | 1)[] = [];
@@ -612,8 +616,6 @@ export class LearningService {
         '진단평가 데이터를 분석 입력으로 변환할 수 없습니다.',
       );
     }
-
-    const restrictToTags = await this.getCachedConceptTags();
 
     const dkt = await this.dkt.predict({
       studentId: userId,
@@ -643,16 +645,7 @@ export class LearningService {
         .map((c) => [c.knowledgeTag as number, c]),
     );
 
-    const enrich = (
-      entries: typeof dkt.diagnosis.top_5_strong,
-    ): Array<{
-      conceptId: number;
-      conceptName: string;
-      grade: number;
-      semester: number;
-      knowledgeTag: number;
-      probability: number;
-    }> =>
+    const enrich = (entries: typeof dkt.diagnosis.top_5_strong) =>
       entries
         .map((e) => {
           const concept = conceptByTag.get(e.knowledge_tag);
