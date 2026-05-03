@@ -625,8 +625,8 @@ export class LearningService {
     });
 
     const allEntries = [
-      ...dkt.diagnosis.top_5_strong,
-      ...dkt.diagnosis.bottom_5_weak,
+      ...dkt.diagnosis.top_strong,
+      ...dkt.diagnosis.bottom_weak,
     ];
     const tags = Array.from(new Set(allEntries.map((e) => e.knowledge_tag)));
     const concepts = await this.prisma.concept.findMany({
@@ -645,7 +645,7 @@ export class LearningService {
         .map((c) => [c.knowledgeTag as number, c]),
     );
 
-    const enrich = (entries: typeof dkt.diagnosis.top_5_strong) =>
+    const enrich = (entries: typeof dkt.diagnosis.top_strong) =>
       entries
         .map((e) => {
           const concept = conceptByTag.get(e.knowledge_tag);
@@ -662,8 +662,8 @@ export class LearningService {
         .filter((x): x is NonNullable<typeof x> => x !== null);
 
     return {
-      strong: enrich(dkt.diagnosis.top_5_strong),
-      weak: enrich(dkt.diagnosis.bottom_5_weak),
+      strong: enrich(dkt.diagnosis.top_strong),
+      weak: enrich(dkt.diagnosis.bottom_weak),
       fetchedAt: new Date().toISOString(),
     };
   }

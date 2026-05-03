@@ -5,8 +5,8 @@ export interface DktSkillEntry {
 }
 
 export interface DktDiagnosis {
-  top_5_strong: DktSkillEntry[];
-  bottom_5_weak: DktSkillEntry[];
+  top_strong: DktSkillEntry[];
+  bottom_weak: DktSkillEntry[];
 }
 
 export interface DktPredictResponse {
@@ -19,4 +19,6 @@ export interface DktPredictInput {
   knowledgeTags: number[];
   corrects: (0 | 1)[];
   restrictToTags: number[];
+  // 강·약점 각각 몇 개씩 받을지. 미지정 시 DKT 서버 기본 (5).
+  topK?: number;
 }

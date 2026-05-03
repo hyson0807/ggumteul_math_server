@@ -26,6 +26,7 @@ export class DktService {
       knowledge_tags: input.knowledgeTags,
       corrects: input.corrects,
       restrict_to_tags: input.restrictToTags,
+      ...(input.topK !== undefined && { top_k: input.topK }),
     };
 
     const controller = new AbortController();
@@ -50,7 +51,7 @@ export class DktService {
       }
 
       const data = (await res.json()) as DktPredictResponse;
-      if (!data?.diagnosis?.top_5_strong || !data?.diagnosis?.bottom_5_weak) {
+      if (!data?.diagnosis?.top_strong || !data?.diagnosis?.bottom_weak) {
         throw new ServiceUnavailableException(
           'AI 분석 서버가 비정상 응답을 반환했습니다.',
         );
