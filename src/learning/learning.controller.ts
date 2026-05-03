@@ -49,6 +49,11 @@ export class LearningController {
     return this.learning.getDiagnosticResult(userId);
   }
 
+  @Get('diagnostic/profile')
+  getDiagnosticProfile(@CurrentUser('sub') userId: string) {
+    return this.learning.getDiagnosticProfile(userId);
+  }
+
   @Get('diagnostic/:grade')
   getDiagnostic(@Param('grade', ParseIntPipe) grade: number) {
     return this.learning.getDiagnostic(grade);

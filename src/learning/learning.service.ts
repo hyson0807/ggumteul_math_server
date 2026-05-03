@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../common/constants/user-select';
@@ -20,6 +21,7 @@ import {
   getDiagnosticIds,
 } from '../common/constants/diagnostic';
 import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
+import { DktService } from '../dkt/dkt.service';
 
 function calcCoinReward(difficulty: number, timeSpent: number) {
   const base = 10;
@@ -56,7 +58,14 @@ function resolveCorrectAnswer(problem: {
 
 @Injectable()
 export class LearningService {
-  constructor(private readonly prisma: PrismaService) {}
+  // 우리 커리큘럼의 knowledgeTag 목록 (DKT restrict_to_tags 용).
+  // 시드는 부팅 후 변경되지 않으므로 첫 호출 시 1회만 로드.
+  private cachedConceptTags: number[] | null = null;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dkt: DktService,
+  ) {}
 
   async getStages(userId: string) {
     const [user, playableConcepts, clearedCounts] = await Promise.all([
@@ -563,6 +572,119 @@ export class LearningService {
       completedAt: user.diagnosticCompletedAt,
       items,
     };
+  }
+
+  async getDiagnosticProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        diagnosticCompletedAt: true,
+        diagnosticGrade: true,
+      },
+    });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    if (!user.diagnosticCompletedAt || !user.diagnosticGrade) {
+      throw new NotFoundException('아직 진단평가를 완료하지 않았습니다.');
+    }
+
+    const ids = getDiagnosticIds(user.diagnosticGrade) ?? [];
+    const records = await this.prisma.learningRecord.findMany({
+      where: { userId, problemId: { in: ids } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        correct: true,
+        problem: {
+          select: { concept: { select: { knowledgeTag: true } } },
+        },
+      },
+    });
+
+    const knowledgeTags: number[] = [];
+    const corrects: (0 | 1)[] = [];
+    for (const r of records) {
+      const tag = r.problem.concept.knowledgeTag;
+      if (tag === null || tag === undefined) continue;
+      knowledgeTags.push(tag);
+      corrects.push(r.correct ? 1 : 0);
+    }
+    if (knowledgeTags.length === 0) {
+      throw new ServiceUnavailableException(
+        '진단평가 데이터를 분석 입력으로 변환할 수 없습니다.',
+      );
+    }
+
+    const restrictToTags = await this.getCachedConceptTags();
+
+    const dkt = await this.dkt.predict({
+      studentId: userId,
+      knowledgeTags,
+      corrects,
+      restrictToTags,
+    });
+
+    const allEntries = [
+      ...dkt.diagnosis.top_5_strong,
+      ...dkt.diagnosis.bottom_5_weak,
+    ];
+    const tags = Array.from(new Set(allEntries.map((e) => e.knowledge_tag)));
+    const concepts = await this.prisma.concept.findMany({
+      where: { knowledgeTag: { in: tags } },
+      select: {
+        id: true,
+        name: true,
+        grade: true,
+        semester: true,
+        knowledgeTag: true,
+      },
+    });
+    const conceptByTag = new Map(
+      concepts
+        .filter((c) => c.knowledgeTag !== null)
+        .map((c) => [c.knowledgeTag as number, c]),
+    );
+
+    const enrich = (
+      entries: typeof dkt.diagnosis.top_5_strong,
+    ): Array<{
+      conceptId: number;
+      conceptName: string;
+      grade: number;
+      semester: number;
+      knowledgeTag: number;
+      probability: number;
+    }> =>
+      entries
+        .map((e) => {
+          const concept = conceptByTag.get(e.knowledge_tag);
+          if (!concept) return null;
+          return {
+            conceptId: concept.id,
+            conceptName: concept.name,
+            grade: concept.grade,
+            semester: concept.semester,
+            knowledgeTag: e.knowledge_tag,
+            probability: e.probability,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    return {
+      strong: enrich(dkt.diagnosis.top_5_strong),
+      weak: enrich(dkt.diagnosis.bottom_5_weak),
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  private async getCachedConceptTags(): Promise<number[]> {
+    if (this.cachedConceptTags) return this.cachedConceptTags;
+    const concepts = await this.prisma.concept.findMany({
+      where: { knowledgeTag: { not: null } },
+      select: { knowledgeTag: true },
+    });
+    this.cachedConceptTags = concepts
+      .map((c) => c.knowledgeTag)
+      .filter((t): t is number => t !== null);
+    return this.cachedConceptTags;
   }
 
   private async countClearedByConcept(
