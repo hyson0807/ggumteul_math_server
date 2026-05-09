@@ -61,9 +61,8 @@ export class LearningService {
   // 우리 커리큘럼의 (knowledgeTag, grade) 목록 (DKT restrict_to_tags 용).
   // 진단평가 프로파일에서 사용자 학년 이하 영역만 추출하기 위해 grade 도 함께 캐싱.
   // 시드는 부팅 후 변경되지 않으므로 첫 호출 시 1회만 로드.
-  private cachedConceptTagsWithGrade:
-    | { tag: number; grade: number }[]
-    | null = null;
+  private cachedConceptTagsWithGrade: { tag: number; grade: number }[] | null =
+    null;
 
   constructor(
     private readonly prisma: PrismaService,

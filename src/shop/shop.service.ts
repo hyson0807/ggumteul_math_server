@@ -18,7 +18,11 @@ export class ShopService {
     const [items, inventory, user] = await Promise.all([
       this.prisma.shopItem.findMany({
         select: SHOP_ITEM_PUBLIC_SELECT,
-        orderBy: [{ category: 'asc' }, { unlockStage: 'asc' }, { price: 'asc' }],
+        orderBy: [
+          { category: 'asc' },
+          { unlockStage: 'asc' },
+          { price: 'asc' },
+        ],
       }),
       this.prisma.inventory.findMany({
         where: { userId },
@@ -36,9 +40,11 @@ export class ShopService {
 
     const ownedSet = new Set(inventory.map((i) => i.shopItemId));
     const equippedSet = new Set(
-      [user?.equippedHatId, user?.equippedBodyId, user?.equippedAccessoryId].filter(
-        (v): v is string => typeof v === 'string',
-      ),
+      [
+        user?.equippedHatId,
+        user?.equippedBodyId,
+        user?.equippedAccessoryId,
+      ].filter((v): v is string => typeof v === 'string'),
     );
 
     return items.map((item) => ({
@@ -70,9 +76,11 @@ export class ShopService {
     ]);
 
     const equippedSet = new Set(
-      [user?.equippedHatId, user?.equippedBodyId, user?.equippedAccessoryId].filter(
-        (v): v is string => typeof v === 'string',
-      ),
+      [
+        user?.equippedHatId,
+        user?.equippedBodyId,
+        user?.equippedAccessoryId,
+      ].filter((v): v is string => typeof v === 'string'),
     );
 
     return records.map((r) => ({

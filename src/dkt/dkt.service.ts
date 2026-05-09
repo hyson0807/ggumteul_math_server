@@ -4,10 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  DktPredictInput,
-  DktPredictResponse,
-} from './dkt.types';
+import { DktPredictInput, DktPredictResponse } from './dkt.types';
 
 @Injectable()
 export class DktService {
@@ -16,7 +13,9 @@ export class DktService {
   private readonly timeoutMs: number;
 
   constructor(private readonly config: ConfigService) {
-    this.baseUrl = config.getOrThrow<string>('DKT_BASE_URL').replace(/\/+$/, '');
+    this.baseUrl = config
+      .getOrThrow<string>('DKT_BASE_URL')
+      .replace(/\/+$/, '');
     this.timeoutMs = Number(config.get<string>('DKT_TIMEOUT_MS') ?? '10000');
   }
 

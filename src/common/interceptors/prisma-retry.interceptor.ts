@@ -23,14 +23,11 @@ const RETRY_DELAYS_MS = [1500, 3000] as const;
 export class PrismaRetryInterceptor implements NestInterceptor {
   private readonly logger = new Logger(PrismaRetryInterceptor.name);
 
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       retry({
         count: RETRY_DELAYS_MS.length,
-        delay: (error, retryCount) => {
+        delay: (error: unknown, retryCount) => {
           const code = (error as { code?: string })?.code;
           if (!code || !TRANSIENT_CODES.has(code)) {
             return throwError(() => error);

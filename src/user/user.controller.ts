@@ -22,10 +22,7 @@ export class UserController {
   }
 
   @Patch('me')
-  updateMe(
-    @CurrentUser('sub') userId: string,
-    @Body() data: UpdateMeDto,
-  ) {
+  updateMe(@CurrentUser('sub') userId: string, @Body() data: UpdateMeDto) {
     return this.user.updateMe(userId, data);
   }
 

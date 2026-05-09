@@ -227,21 +227,25 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    let user;
-    try {
-      user = await this.prisma.user.create({
+    const user = await this.prisma.user
+      .create({
         data: {
           email: dto.email,
           passwordHash,
         },
         select: USER_PUBLIC_SELECT,
+      })
+      .catch((e: unknown) => {
+        if (
+          typeof e === 'object' &&
+          e !== null &&
+          'code' in e &&
+          (e as { code: unknown }).code === 'P2002'
+        ) {
+          throw new ConflictException('이미 사용 중인 이메일입니다.');
+        }
+        throw e;
       });
-    } catch (e: any) {
-      if (e.code === 'P2002') {
-        throw new ConflictException('이미 사용 중인 이메일입니다.');
-      }
-      throw e;
-    }
 
     const tokens = await this.issueTokens(user.id);
     return { ...tokens, user };
