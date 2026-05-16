@@ -26,6 +26,9 @@ export class DktService {
       corrects: input.corrects,
       restrict_to_tags: input.restrictToTags,
       ...(input.topK !== undefined && { top_k: input.topK }),
+      ...(input.includeAllProbabilities && {
+        include_all_probabilities: true,
+      }),
     };
 
     const controller = new AbortController();

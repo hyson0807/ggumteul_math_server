@@ -22,51 +22,15 @@ import {
 } from '../common/constants/diagnostic';
 import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 import { DktService } from '../dkt/dkt.service';
-
-function calcCoinReward(difficulty: number, timeSpent: number) {
-  const base = 10;
-  const diffBonus = Math.max(0, Math.min(25, difficulty * 5));
-  const speedBonus = timeSpent <= 30 ? 5 : 0;
-  return base + diffBonus + speedBonus;
-}
-
-/**
- * MCQ의 `problem.answer`는 선택지 번호(1~4)로 저장되어 있으므로
- * 해당 choice 텍스트로 정규화한다. 프론트는 선택한 choice 텍스트를 그대로 전송.
- * 인덱스 형태가 아닌 MCQ 또는 주관식은 원본 answer 텍스트를 그대로 사용.
- */
-function resolveCorrectAnswer(problem: {
-  problemType: 'SUBJ' | 'MCQ';
-  answer: string;
-  choice1: string | null;
-  choice2: string | null;
-  choice3: string | null;
-  choice4: string | null;
-}): string {
-  const raw = problem.answer.trim();
-  if (problem.problemType !== 'MCQ') return raw;
-  const idx = Number.parseInt(raw, 10);
-  if (!Number.isFinite(idx) || idx < 1 || idx > 4) return raw;
-  const choices = [
-    problem.choice1,
-    problem.choice2,
-    problem.choice3,
-    problem.choice4,
-  ];
-  return choices[idx - 1]?.trim() ?? raw;
-}
+import { calcCoinReward, resolveCorrectAnswer } from './utils/rewards';
+import { ConceptCatalogService } from './concept-catalog.service';
 
 @Injectable()
 export class LearningService {
-  // 우리 커리큘럼의 (knowledgeTag, grade) 목록 (DKT restrict_to_tags 용).
-  // 진단평가 프로파일에서 사용자 학년 이하 영역만 추출하기 위해 grade 도 함께 캐싱.
-  // 시드는 부팅 후 변경되지 않으므로 첫 호출 시 1회만 로드.
-  private cachedConceptTagsWithGrade: { tag: number; grade: number }[] | null =
-    null;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly dkt: DktService,
+    private readonly conceptCatalog: ConceptCatalogService,
   ) {}
 
   async getStages(userId: string) {
@@ -597,7 +561,7 @@ export class LearningService {
           },
         },
       }),
-      this.getCachedConceptTagsWithGrade(),
+      this.conceptCatalog.getTagsWithGrade(),
     ]);
 
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
@@ -673,25 +637,6 @@ export class LearningService {
       weak: enrich(dkt.diagnosis.bottom_weak),
       fetchedAt: new Date().toISOString(),
     };
-  }
-
-  private async getCachedConceptTagsWithGrade(): Promise<
-    { tag: number; grade: number }[]
-  > {
-    if (this.cachedConceptTagsWithGrade) {
-      return this.cachedConceptTagsWithGrade;
-    }
-    const concepts = await this.prisma.concept.findMany({
-      where: { knowledgeTag: { not: null } },
-      select: { knowledgeTag: true, grade: true },
-    });
-    this.cachedConceptTagsWithGrade = concepts
-      .filter(
-        (c): c is { knowledgeTag: number; grade: number } =>
-          c.knowledgeTag !== null,
-      )
-      .map((c) => ({ tag: c.knowledgeTag, grade: c.grade }));
-    return this.cachedConceptTagsWithGrade;
   }
 
   private async countClearedByConcept(
