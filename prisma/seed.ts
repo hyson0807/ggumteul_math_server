@@ -123,9 +123,11 @@ async function main() {
   console.log(`  ${problemData.length} problems seeded.`);
 
   // 4. Seed Shop Items (지렁이 장착 아이템)
-  console.log('Seeding shop items...');
-  const existingShopCount = await prisma.shopItem.count();
-  if (existingShopCount === 0) {
+  console.log('Seeding shop items (worm)...');
+  const existingWormItemCount = await prisma.shopItem.count({
+    where: { category: { in: ['hat', 'body', 'accessory'] } },
+  });
+  if (existingWormItemCount === 0) {
     await prisma.shopItem.createMany({
       data: [
         // 모자 (hat)
@@ -143,9 +145,42 @@ async function main() {
         { name: '반딧불 목걸이', category: 'accessory', price: 180, imageUrl: '/static/shop/acc_firefly.png', description: '어둠 속에서 반짝이는 목걸이', unlockStage: 3 },
       ],
     });
-    console.log(`  10 shop items seeded.`);
+    console.log(`  10 worm shop items seeded.`);
   } else {
-    console.log(`  ${existingShopCount} shop items already exist, skipping.`);
+    console.log(`  ${existingWormItemCount} worm shop items already exist, skipping.`);
+  }
+
+  // 4-1. Seed Furniture Items (방꾸미기 가구)
+  console.log('Seeding shop items (furniture)...');
+  const existingFurnitureCount = await prisma.shopItem.count({
+    where: { category: { in: ['desk', 'shelf', 'clock', 'bed', 'light', 'rug'] } },
+  });
+  if (existingFurnitureCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        // 책상 (desk) — PNG 안에 의자 포함됨, 별도 의자 카테고리 없음
+        { name: '딸기 책상', category: 'desk', price: 450, imageUrl: '/static/furniture/desk_strawberry.png', description: '귀여운 딸기 무늬 책상', unlockStage: 1 },
+        { name: '초록 책상', category: 'desk', price: 400, imageUrl: '/static/furniture/desk_green.png', description: '싱그러운 초록 잎사귀 책상', unlockStage: 1 },
+        // 책장 (shelf)
+        { name: '딸기 책장', category: 'shelf', price: 380, imageUrl: '/static/furniture/shelf_strawberry.png', description: '귀여운 딸기 책장', unlockStage: 1 },
+        { name: '초록 책장', category: 'shelf', price: 350, imageUrl: '/static/furniture/shelf_green.png', description: '튼튼한 초록 책장', unlockStage: 1 },
+        // 시계 (clock)
+        { name: '딸기 시계', category: 'clock', price: 220, imageUrl: '/static/furniture/clock_strawberry.png', description: '벽에 거는 딸기 시계', unlockStage: 1 },
+        { name: '초록 시계', category: 'clock', price: 200, imageUrl: '/static/furniture/clock_green.png', description: '벽에 거는 초록 시계', unlockStage: 1 },
+        // 침대 (bed)
+        { name: '딸기 침대', category: 'bed', price: 600, imageUrl: '/static/furniture/bed_strawberry.png', description: '폭신한 딸기 침대', unlockStage: 1 },
+        { name: '초록 침대', category: 'bed', price: 550, imageUrl: '/static/furniture/bed_green.png', description: '폭신한 초록 침대', unlockStage: 1 },
+        // 조명 (light)
+        { name: '딸기 조명', category: 'light', price: 280, imageUrl: '/static/furniture/light_strawberry.png', description: '아늑한 딸기 조명', unlockStage: 1 },
+        { name: '초록 조명', category: 'light', price: 250, imageUrl: '/static/furniture/light_green.png', description: '아늑한 초록 조명', unlockStage: 1 },
+        // 러그 (rug)
+        { name: '딸기 러그', category: 'rug', price: 320, imageUrl: '/static/furniture/rug_strawberry.png', description: '푹신한 딸기 러그', unlockStage: 1 },
+        { name: '초록 러그', category: 'rug', price: 300, imageUrl: '/static/furniture/rug_green.png', description: '푹신한 초록 러그', unlockStage: 1 },
+      ],
+    });
+    console.log(`  14 furniture shop items seeded.`);
+  } else {
+    console.log(`  ${existingFurnitureCount} furniture shop items already exist, skipping.`);
   }
 
   // 5. Seed Diagnostic Problems (PID 10001~)

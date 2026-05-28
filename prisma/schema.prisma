@@ -32,6 +32,13 @@ model User {
   equippedBodyId      String? @map("equipped_body_id")
   equippedAccessoryId String? @map("equipped_accessory_id")
 
+  equippedDeskId  String? @map("equipped_desk_id")
+  equippedShelfId String? @map("equipped_shelf_id")
+  equippedClockId String? @map("equipped_clock_id")
+  equippedBedId   String? @map("equipped_bed_id")
+  equippedLightId String? @map("equipped_light_id")
+  equippedRugId   String? @map("equipped_rug_id")
+
   diagnosticCompletedAt DateTime? @map("diagnostic_completed_at")
   diagnosticScore       Int?      @map("diagnostic_score")
   diagnosticGrade       Int?      @map("diagnostic_grade")
@@ -39,6 +46,13 @@ model User {
   equippedHat       ShopItem? @relation("EquippedHat", fields: [equippedHatId], references: [id])
   equippedBody      ShopItem? @relation("EquippedBody", fields: [equippedBodyId], references: [id])
   equippedAccessory ShopItem? @relation("EquippedAccessory", fields: [equippedAccessoryId], references: [id])
+
+  equippedDesk  ShopItem? @relation("EquippedDesk",  fields: [equippedDeskId],  references: [id])
+  equippedShelf ShopItem? @relation("EquippedShelf", fields: [equippedShelfId], references: [id])
+  equippedClock ShopItem? @relation("EquippedClock", fields: [equippedClockId], references: [id])
+  equippedBed   ShopItem? @relation("EquippedBed",   fields: [equippedBedId],   references: [id])
+  equippedLight ShopItem? @relation("EquippedLight", fields: [equippedLightId], references: [id])
+  equippedRug   ShopItem? @relation("EquippedRug",   fields: [equippedRugId],   references: [id])
 
   learningRecords LearningRecord[]
   inventory       Inventory[]
@@ -131,6 +145,12 @@ enum ShopCategory {
   hat
   body
   accessory
+  desk
+  shelf
+  clock
+  bed
+  light
+  rug
 }
 
 model ShopItem {
@@ -146,6 +166,13 @@ model ShopItem {
   equippedByHat       User[]       @relation("EquippedHat")
   equippedByBody      User[]       @relation("EquippedBody")
   equippedByAccessory User[]       @relation("EquippedAccessory")
+
+  equippedByDesk  User[] @relation("EquippedDesk")
+  equippedByShelf User[] @relation("EquippedShelf")
+  equippedByClock User[] @relation("EquippedClock")
+  equippedByBed   User[] @relation("EquippedBed")
+  equippedByLight User[] @relation("EquippedLight")
+  equippedByRug   User[] @relation("EquippedRug")
 
   @@map("shop_item")
 }

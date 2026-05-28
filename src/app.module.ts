@@ -10,6 +10,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { WormModule } from './worm/worm.module';
+import { RoomModule } from './room/room.module';
 import { ShopModule } from './shop/shop.module';
 import { LearningModule } from './learning/learning.module';
 import { AppMetaModule } from './app-meta/app-meta.module';
@@ -27,6 +28,7 @@ import { PrismaRetryInterceptor } from './common/interceptors/prisma-retry.inter
     AuthModule,
     UserModule,
     WormModule,
+    RoomModule,
     ShopModule,
     LearningModule,
     AppMetaModule,
