@@ -23,6 +23,13 @@ import { PrismaRetryInterceptor } from './common/interceptors/prisma-retry.inter
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       serveRoot: '/static',
+      // 가구/벽지/문제 이미지는 같은 이름의 파일을 덮어쓰지 않고 새 이름으로 추가하는
+      // 정책이라 immutable 안전. 기존 파일명 그대로 내용만 바꿔치우면 클라이언트가
+      // 최대 1년간 갱신을 안 받으니, 교체 시 파일명도 함께 변경할 것.
+      serveStaticOptions: {
+        maxAge: '365d',
+        immutable: true,
+      },
     }),
     PrismaModule,
     AuthModule,
