@@ -150,12 +150,17 @@ async function main() {
     console.log(`  ${existingWormItemCount} worm shop items already exist, skipping.`);
   }
 
-  // 4-1. Seed Furniture Items (방꾸미기 가구)
+  // 4-1. Seed Furniture Items (방꾸미기 가구) — 테마별 가드
   console.log('Seeding shop items (furniture)...');
-  const existingFurnitureCount = await prisma.shopItem.count({
-    where: { category: { in: ['desk', 'shelf', 'clock', 'bed', 'light', 'rug'] } },
+
+  // 딸기 + 초록 (초기 12개)
+  const baseThemeCount = await prisma.shopItem.count({
+    where: {
+      category: { in: ['desk', 'shelf', 'clock', 'bed', 'light', 'rug'] },
+      name: { contains: '딸기' },
+    },
   });
-  if (existingFurnitureCount === 0) {
+  if (baseThemeCount === 0) {
     await prisma.shopItem.createMany({
       data: [
         // 책상 (desk) — PNG 안에 의자 포함됨, 별도 의자 카테고리 없음
@@ -178,9 +183,47 @@ async function main() {
         { name: '초록 러그', category: 'rug', price: 300, imageUrl: '/static/furniture/rug_green.png', description: '푹신한 초록 러그', unlockStage: 1 },
       ],
     });
-    console.log(`  14 furniture shop items seeded.`);
+    console.log(`  12 base furniture shop items seeded (딸기+초록).`);
   } else {
-    console.log(`  ${existingFurnitureCount} furniture shop items already exist, skipping.`);
+    console.log(`  base furniture already exists, skipping.`);
+  }
+
+  // 벽지 (4종) — 방 전체 배경 교체용
+  const wallpaperCount = await prisma.shopItem.count({
+    where: { category: 'wallpaper' },
+  });
+  if (wallpaperCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        { name: '핑크 덩굴 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_pink_vine.png', description: '귀여운 핑크 덩굴 무늬 벽지', unlockStage: 1 },
+        { name: '크림 플로럴 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_cream_floral.png', description: '따뜻한 크림 꽃무늬 벽지', unlockStage: 1 },
+        { name: '하늘 블루 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_sky_blue.png', description: '청량한 하늘색 벽지', unlockStage: 1 },
+        { name: '구름 블루 벽지', category: 'wallpaper', price: 900, imageUrl: '/static/furniture/wallpaper_blue_cloud.png', description: '몽글몽글 구름 벽지', unlockStage: 1 },
+      ],
+    });
+    console.log(`  4 wallpaper shop items seeded.`);
+  } else {
+    console.log(`  wallpaper already exists, skipping.`);
+  }
+
+  // 파랑 테마 (6개)
+  const blueThemeCount = await prisma.shopItem.count({
+    where: { name: { contains: '파랑' } },
+  });
+  if (blueThemeCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        { name: '파랑 책상', category: 'desk', price: 420, imageUrl: '/static/furniture/desk_blue.png', description: '시원한 파랑 책상', unlockStage: 1 },
+        { name: '파랑 책장', category: 'shelf', price: 360, imageUrl: '/static/furniture/shelf_blue.png', description: '단정한 파랑 책장', unlockStage: 1 },
+        { name: '파랑 시계', category: 'clock', price: 210, imageUrl: '/static/furniture/clock_blue.png', description: '벽에 거는 파랑 시계', unlockStage: 1 },
+        { name: '파랑 침대', category: 'bed', price: 580, imageUrl: '/static/furniture/bed_blue.png', description: '폭신한 파랑 침대', unlockStage: 1 },
+        { name: '파랑 조명', category: 'light', price: 270, imageUrl: '/static/furniture/light_blue.png', description: '은은한 파랑 조명', unlockStage: 1 },
+        { name: '파랑 러그', category: 'rug', price: 310, imageUrl: '/static/furniture/rug_blue.png', description: '폭신한 파랑 러그', unlockStage: 1 },
+      ],
+    });
+    console.log(`  6 blue furniture shop items seeded.`);
+  } else {
+    console.log(`  blue furniture already exists, skipping.`);
   }
 
   // 5. Seed Diagnostic Problems (PID 10001~)

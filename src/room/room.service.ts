@@ -16,6 +16,7 @@ const ROOM_STATE_SELECT = {
   equippedBed: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedLight: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedRug: { select: SHOP_ITEM_PUBLIC_SELECT },
+  equippedWallpaper: { select: SHOP_ITEM_PUBLIC_SELECT },
 } as const satisfies Prisma.UserSelect;
 
 type RoomStateRow = Prisma.UserGetPayload<{ select: typeof ROOM_STATE_SELECT }>;
@@ -29,6 +30,7 @@ function toRoomStateResponse(row: RoomStateRow) {
       bed: row.equippedBed,
       light: row.equippedLight,
       rug: row.equippedRug,
+      wallpaper: row.equippedWallpaper,
     },
   };
 }

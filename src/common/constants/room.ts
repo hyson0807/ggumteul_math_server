@@ -5,6 +5,7 @@ export const ROOM_SLOTS = [
   'bed',
   'light',
   'rug',
+  'wallpaper',
 ] as const;
 
 export type RoomSlot = (typeof ROOM_SLOTS)[number];
@@ -17,6 +18,7 @@ export const ROOM_SLOT_TO_FIELD: Record<
   | 'equippedBedId'
   | 'equippedLightId'
   | 'equippedRugId'
+  | 'equippedWallpaperId'
 > = {
   desk: 'equippedDeskId',
   shelf: 'equippedShelfId',
@@ -24,6 +26,7 @@ export const ROOM_SLOT_TO_FIELD: Record<
   bed: 'equippedBedId',
   light: 'equippedLightId',
   rug: 'equippedRugId',
+  wallpaper: 'equippedWallpaperId',
 };
 
 export function isRoomSlot(value: string): value is RoomSlot {
