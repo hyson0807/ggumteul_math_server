@@ -10,6 +10,39 @@ import { PrismaService } from '../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../common/constants/user-select';
 import { SHOP_ITEM_PUBLIC_SELECT } from '../common/constants/shop-select';
 
+// 모든 장착 슬롯 (지렁이 3 + 가구 7) — 지렁이/방 도메인 통합으로 모든 슬롯을 한 번에 조회
+const ALL_EQUIPPED_SELECT = {
+  equippedHatId: true,
+  equippedBodyId: true,
+  equippedAccessoryId: true,
+  equippedDeskId: true,
+  equippedShelfId: true,
+  equippedClockId: true,
+  equippedBedId: true,
+  equippedLightId: true,
+  equippedRugId: true,
+  equippedWallpaperId: true,
+} as const satisfies Prisma.UserSelect;
+
+type AllEquipped = Prisma.UserGetPayload<{ select: typeof ALL_EQUIPPED_SELECT }>;
+
+function collectEquippedIds(user: AllEquipped | null): Set<string> {
+  return new Set(
+    [
+      user?.equippedHatId,
+      user?.equippedBodyId,
+      user?.equippedAccessoryId,
+      user?.equippedDeskId,
+      user?.equippedShelfId,
+      user?.equippedClockId,
+      user?.equippedBedId,
+      user?.equippedLightId,
+      user?.equippedRugId,
+      user?.equippedWallpaperId,
+    ].filter((v): v is string => typeof v === 'string'),
+  );
+}
+
 @Injectable()
 export class ShopService {
   constructor(private readonly prisma: PrismaService) {}
@@ -30,22 +63,12 @@ export class ShopService {
       }),
       this.prisma.user.findUnique({
         where: { id: userId },
-        select: {
-          equippedHatId: true,
-          equippedBodyId: true,
-          equippedAccessoryId: true,
-        },
+        select: ALL_EQUIPPED_SELECT,
       }),
     ]);
 
     const ownedSet = new Set(inventory.map((i) => i.shopItemId));
-    const equippedSet = new Set(
-      [
-        user?.equippedHatId,
-        user?.equippedBodyId,
-        user?.equippedAccessoryId,
-      ].filter((v): v is string => typeof v === 'string'),
-    );
+    const equippedSet = collectEquippedIds(user);
 
     return items.map((item) => ({
       ...item,
@@ -67,21 +90,11 @@ export class ShopService {
       }),
       this.prisma.user.findUnique({
         where: { id: userId },
-        select: {
-          equippedHatId: true,
-          equippedBodyId: true,
-          equippedAccessoryId: true,
-        },
+        select: ALL_EQUIPPED_SELECT,
       }),
     ]);
 
-    const equippedSet = new Set(
-      [
-        user?.equippedHatId,
-        user?.equippedBodyId,
-        user?.equippedAccessoryId,
-      ].filter((v): v is string => typeof v === 'string'),
-    );
+    const equippedSet = collectEquippedIds(user);
 
     return records.map((r) => ({
       inventoryId: r.id,
