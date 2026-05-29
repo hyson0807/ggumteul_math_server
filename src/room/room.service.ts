@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SHOP_ITEM_PUBLIC_SELECT } from '../common/constants/shop-select';
 import { ROOM_SLOT_TO_FIELD, RoomSlot } from '../common/constants/room';
+import { RoomLayoutDto } from './dto/save-room-layout.dto';
 
 const ROOM_STATE_SELECT = {
   equippedDesk: { select: SHOP_ITEM_PUBLIC_SELECT },
@@ -17,6 +18,7 @@ const ROOM_STATE_SELECT = {
   equippedLight: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedRug: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedWallpaper: { select: SHOP_ITEM_PUBLIC_SELECT },
+  roomLayout: true,
 } as const satisfies Prisma.UserSelect;
 
 type RoomStateRow = Prisma.UserGetPayload<{ select: typeof ROOM_STATE_SELECT }>;
@@ -32,6 +34,7 @@ function toRoomStateResponse(row: RoomStateRow) {
       rug: row.equippedRug,
       wallpaper: row.equippedWallpaper,
     },
+    layout: row.roomLayout ?? null,
   };
 }
 
@@ -93,6 +96,16 @@ export class RoomService {
     const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { [ROOM_SLOT_TO_FIELD[slot]]: null },
+      select: ROOM_STATE_SELECT,
+    });
+
+    return toRoomStateResponse(updated);
+  }
+
+  async saveLayout(userId: string, layout: RoomLayoutDto) {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { roomLayout: layout as unknown as Prisma.InputJsonValue },
       select: ROOM_STATE_SELECT,
     });
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { RoomService } from './room.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -6,6 +6,7 @@ import {
   EquipFurnitureDto,
   UnequipFurnitureDto,
 } from './dto/equip-furniture.dto';
+import { SaveRoomLayoutDto } from './dto/save-room-layout.dto';
 
 @Controller('room')
 @UseGuards(JwtAuthGuard)
@@ -28,5 +29,13 @@ export class RoomController {
     @Body() dto: UnequipFurnitureDto,
   ) {
     return this.room.unequip(userId, dto.slot);
+  }
+
+  @Patch('layout')
+  saveLayout(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SaveRoomLayoutDto,
+  ) {
+    return this.room.saveLayout(userId, dto.layout);
   }
 }

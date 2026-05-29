@@ -40,6 +40,9 @@ model User {
   equippedRugId       String? @map("equipped_rug_id")
   equippedWallpaperId String? @map("equipped_wallpaper_id")
 
+  // 방꾸미기 자유 배치 — 슬롯별 {x, y, rotate, flipX} (worm 은 x,y 만). 정규화 0~1 좌표.
+  roomLayout Json? @map("room_layout")
+
   diagnosticCompletedAt DateTime? @map("diagnostic_completed_at")
   diagnosticScore       Int?      @map("diagnostic_score")
   diagnosticGrade       Int?      @map("diagnostic_grade")
