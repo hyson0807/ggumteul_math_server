@@ -76,6 +76,16 @@ export class RoomLayoutDto {
   @ValidateNested()
   @Type(() => FurnitureSlotPositionDto)
   rug?: FurnitureSlotPositionDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FurnitureSlotPositionDto)
+  toy?: FurnitureSlotPositionDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FurnitureSlotPositionDto)
+  window?: FurnitureSlotPositionDto;
 }
 
 export class SaveRoomLayoutDto {

@@ -188,22 +188,20 @@ async function main() {
     console.log(`  base furniture already exists, skipping.`);
   }
 
-  // 벽지 (4종) — 방 전체 배경 교체용
-  const wallpaperCount = await prisma.shopItem.count({
-    where: { category: 'wallpaper' },
-  });
-  if (wallpaperCount === 0) {
-    await prisma.shopItem.createMany({
-      data: [
-        { name: '핑크 덩굴 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_pink_vine.png', description: '귀여운 핑크 덩굴 무늬 벽지', unlockStage: 1 },
-        { name: '크림 플로럴 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_cream_floral.png', description: '따뜻한 크림 꽃무늬 벽지', unlockStage: 1 },
-        { name: '하늘 블루 벽지', category: 'wallpaper', price: 800, imageUrl: '/static/furniture/wallpaper_sky_blue.png', description: '청량한 하늘색 벽지', unlockStage: 1 },
-        { name: '구름 블루 벽지', category: 'wallpaper', price: 900, imageUrl: '/static/furniture/wallpaper_blue_cloud.png', description: '몽글몽글 구름 벽지', unlockStage: 1 },
-      ],
-    });
-    console.log(`  4 wallpaper shop items seeded.`);
-  } else {
-    console.log(`  wallpaper already exists, skipping.`);
+  // 벽지 (5종) — 방 전체 배경 교체용
+  const wallpaperItems = [
+    { name: '핑크 덩굴 벽지', category: 'wallpaper' as const, price: 800, imageUrl: '/static/furniture/wallpaper_pink_vine.png', description: '귀여운 핑크 덩굴 무늬 벽지', unlockStage: 1 },
+    { name: '크림 플로럴 벽지', category: 'wallpaper' as const, price: 800, imageUrl: '/static/furniture/wallpaper_cream_floral.png', description: '따뜻한 크림 꽃무늬 벽지', unlockStage: 1 },
+    { name: '하늘 블루 벽지', category: 'wallpaper' as const, price: 800, imageUrl: '/static/furniture/wallpaper_sky_blue.png', description: '청량한 하늘색 벽지', unlockStage: 1 },
+    { name: '구름 블루 벽지', category: 'wallpaper' as const, price: 900, imageUrl: '/static/furniture/wallpaper_blue_cloud.png', description: '몽글몽글 구름 벽지', unlockStage: 1 },
+    { name: '노랑 플로럴 벽지', category: 'wallpaper' as const, price: 800, imageUrl: '/static/furniture/wallpaper_yellow_floral.png', description: '사랑스러운 노랑 꽃무늬 벽지', unlockStage: 1 },
+  ];
+  for (const item of wallpaperItems) {
+    const exists = await prisma.shopItem.findFirst({ where: { imageUrl: item.imageUrl } });
+    if (!exists) {
+      await prisma.shopItem.create({ data: item });
+      console.log(`  wallpaper seeded: ${item.name}`);
+    }
   }
 
   // 파랑 테마 (3개 — 책상/책장/침대 제외)
@@ -230,13 +228,13 @@ async function main() {
   if (yellowThemeCount === 0) {
     await prisma.shopItem.createMany({
       data: [
-        { name: '노랑 러그', category: 'rug', price: 330, imageUrl: '/static/furniture/rug_yellow.jpeg', description: '포근한 노랑 러그', unlockStage: 1 },
-        { name: '노랑 시계', category: 'clock', price: 215, imageUrl: '/static/furniture/clock_yellow.jpeg', description: '벽에 거는 노랑 시계', unlockStage: 1 },
-        { name: '노랑 장난감', category: 'toy', price: 340, imageUrl: '/static/furniture/toy_yellow.jpeg', description: '귀여운 노랑 장난감', unlockStage: 1 },
-        { name: '노랑 조명', category: 'light', price: 260, imageUrl: '/static/furniture/light_yellow.jpeg', description: '따뜻한 노랑 조명', unlockStage: 1 },
-        { name: '노랑 책상', category: 'desk', price: 430, imageUrl: '/static/furniture/desk_yellow.jpeg', description: '밝은 노랑 책상', unlockStage: 1 },
-        { name: '노랑 책장', category: 'shelf', price: 370, imageUrl: '/static/furniture/shelf_yellow.jpeg', description: '튼튼한 노랑 책장', unlockStage: 1 },
-        { name: '노랑 침대', category: 'bed', price: 560, imageUrl: '/static/furniture/bed_yellow.jpeg', description: '폭신한 노랑 침대', unlockStage: 1 },
+        { name: '노랑 러그', category: 'rug', price: 330, imageUrl: '/static/furniture/rug_yellow.png', description: '포근한 노랑 러그', unlockStage: 1 },
+        { name: '노랑 시계', category: 'clock', price: 215, imageUrl: '/static/furniture/clock_yellow.png', description: '벽에 거는 노랑 시계', unlockStage: 1 },
+        { name: '노랑 장난감', category: 'toy', price: 340, imageUrl: '/static/furniture/toy_yellow.png', description: '귀여운 노랑 장난감', unlockStage: 1 },
+        { name: '노랑 조명', category: 'light', price: 260, imageUrl: '/static/furniture/light_yellow.png', description: '따뜻한 노랑 조명', unlockStage: 1 },
+        { name: '노랑 책상', category: 'desk', price: 430, imageUrl: '/static/furniture/desk_yellow.png', description: '밝은 노랑 책상', unlockStage: 1 },
+        { name: '노랑 책장', category: 'shelf', price: 370, imageUrl: '/static/furniture/shelf_yellow.png', description: '튼튼한 노랑 책장', unlockStage: 1 },
+        { name: '노랑 침대', category: 'bed', price: 560, imageUrl: '/static/furniture/bed_yellow.png', description: '폭신한 노랑 침대', unlockStage: 1 },
       ],
     });
     console.log(`  7 yellow furniture shop items seeded.`);
@@ -251,9 +249,9 @@ async function main() {
   if (windowCount === 0) {
     await prisma.shopItem.createMany({
       data: [
-        { name: '노랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_yellow.jpeg', description: '햇살 가득한 노랑 창문', unlockStage: 1 },
+        { name: '노랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_yellow.png', description: '햇살 가득한 노랑 창문', unlockStage: 1 },
         { name: '딸기 창문', category: 'window', price: 500, imageUrl: '/static/furniture/window_strawberry.png', description: '귀여운 딸기 장식 창문', unlockStage: 1 },
-        { name: '파랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_blue.jpeg', description: '달빛 별빛 파랑 창문', unlockStage: 1 },
+        { name: '파랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_blue.png', description: '달빛 별빛 파랑 창문', unlockStage: 1 },
         { name: '초록 창문', category: 'window', price: 490, imageUrl: '/static/furniture/window_green.png', description: '싱그러운 초록 창문', unlockStage: 1 },
       ],
     });
