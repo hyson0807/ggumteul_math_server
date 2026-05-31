@@ -40,6 +40,7 @@ model User {
   equippedRugId       String? @map("equipped_rug_id")
   equippedWallpaperId String? @map("equipped_wallpaper_id")
   equippedToyId       String? @map("equipped_toy_id")
+  equippedWindowId    String? @map("equipped_window_id")
 
   // 방꾸미기 자유 배치 — 슬롯별 {x, y, rotate, flipX} (worm 은 x,y 만). 정규화 0~1 좌표.
   roomLayout Json? @map("room_layout")
@@ -60,6 +61,7 @@ model User {
   equippedRug       ShopItem? @relation("EquippedRug",       fields: [equippedRugId],       references: [id])
   equippedWallpaper ShopItem? @relation("EquippedWallpaper", fields: [equippedWallpaperId], references: [id])
   equippedToy       ShopItem? @relation("EquippedToy",       fields: [equippedToyId],       references: [id])
+  equippedWindow    ShopItem? @relation("EquippedWindow",    fields: [equippedWindowId],    references: [id])
 
   learningRecords LearningRecord[]
   inventory       Inventory[]
@@ -160,6 +162,7 @@ enum ShopCategory {
   rug
   wallpaper
   toy
+  window
 }
 
 model ShopItem {
@@ -184,6 +187,7 @@ model ShopItem {
   equippedByRug       User[] @relation("EquippedRug")
   equippedByWallpaper User[] @relation("EquippedWallpaper")
   equippedByToy       User[] @relation("EquippedToy")
+  equippedByWindow    User[] @relation("EquippedWindow")
 
   @@map("shop_item")
 }

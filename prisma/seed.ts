@@ -244,6 +244,24 @@ async function main() {
     console.log(`  yellow furniture already exists, skipping.`);
   }
 
+  // 창문 (4개 — 노랑/딸기/파랑/초록)
+  const windowCount = await prisma.shopItem.count({
+    where: { category: 'window' },
+  });
+  if (windowCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        { name: '노랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_yellow.jpeg', description: '햇살 가득한 노랑 창문', unlockStage: 1 },
+        { name: '딸기 창문', category: 'window', price: 500, imageUrl: '/static/furniture/window_strawberry.png', description: '귀여운 딸기 장식 창문', unlockStage: 1 },
+        { name: '파랑 창문', category: 'window', price: 480, imageUrl: '/static/furniture/window_blue.jpeg', description: '달빛 별빛 파랑 창문', unlockStage: 1 },
+        { name: '초록 창문', category: 'window', price: 490, imageUrl: '/static/furniture/window_green.png', description: '싱그러운 초록 창문', unlockStage: 1 },
+      ],
+    });
+    console.log(`  4 window shop items seeded.`);
+  } else {
+    console.log(`  window already exists, skipping.`);
+  }
+
   // 5. Seed Diagnostic Problems (PID 10001~)
   console.log('Seeding diagnostic problems...');
   const diagnostics = parseCsv(path.join(seedDataDir, 'diagnostic.csv'));
