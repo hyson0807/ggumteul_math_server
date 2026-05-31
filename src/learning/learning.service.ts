@@ -372,7 +372,19 @@ export class LearningService {
       };
     });
 
-    return result;
+    // 개념을 새로 클리어했고 스테이지 진급이 아니면, 같은 학기에서 다음에 풀
+    // 미클리어 노드를 찾아 프론트가 곧장 이어서 진행할 수 있게 한다.
+    let nextConceptId: number | null = null;
+    if (result.nodeNewlyCleared && !result.stageNewlyCleared) {
+      nextConceptId = await this.findNextConceptId(
+        userId,
+        problem.concept.grade,
+        problem.concept.semester,
+        problem.conceptId,
+      );
+    }
+
+    return { ...result, nextConceptId };
   }
 
   async getDiagnostic(grade: number) {
@@ -706,5 +718,41 @@ export class LearningService {
       if (total > 0 && (counts.get(id) ?? 0) >= total) cleared.add(id);
     }
     return cleared;
+  }
+
+  /**
+   * 같은 학기(grade/semester) 노드 순서(order asc, id asc)에서 현재 개념 다음에
+   * 오는 첫 번째 플레이가능·미클리어 개념의 id를 반환한다. 없으면 null.
+   */
+  private async findNextConceptId(
+    userId: string,
+    grade: number,
+    semester: number,
+    currentConceptId: number,
+  ): Promise<number | null> {
+    const concepts = await this.prisma.concept.findMany({
+      where: { grade, semester },
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        _count: {
+          select: { problems: { where: { id: { lt: DIAGNOSTIC_PID_MIN } } } },
+        },
+      },
+    });
+
+    const playableTotals = new Map<number, number>();
+    for (const c of concepts) {
+      if (c._count.problems > 0) playableTotals.set(c.id, c._count.problems);
+    }
+    const clearedSet = await this.getClearedConceptSet(userId, playableTotals);
+
+    const currentIdx = concepts.findIndex((c) => c.id === currentConceptId);
+    if (currentIdx === -1) return null;
+    for (let i = currentIdx + 1; i < concepts.length; i++) {
+      const c = concepts[i];
+      if (c._count.problems > 0 && !clearedSet.has(c.id)) return c.id;
+    }
+    return null;
   }
 }
