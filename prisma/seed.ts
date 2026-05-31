@@ -206,24 +206,42 @@ async function main() {
     console.log(`  wallpaper already exists, skipping.`);
   }
 
-  // 파랑 테마 (6개)
+  // 파랑 테마 (3개 — 책상/책장/침대 제외)
   const blueThemeCount = await prisma.shopItem.count({
     where: { name: { contains: '파랑' } },
   });
   if (blueThemeCount === 0) {
     await prisma.shopItem.createMany({
       data: [
-        { name: '파랑 책상', category: 'desk', price: 420, imageUrl: '/static/furniture/desk_blue.png', description: '시원한 파랑 책상', unlockStage: 1 },
-        { name: '파랑 책장', category: 'shelf', price: 360, imageUrl: '/static/furniture/shelf_blue.png', description: '단정한 파랑 책장', unlockStage: 1 },
         { name: '파랑 시계', category: 'clock', price: 210, imageUrl: '/static/furniture/clock_blue.png', description: '벽에 거는 파랑 시계', unlockStage: 1 },
-        { name: '파랑 침대', category: 'bed', price: 580, imageUrl: '/static/furniture/bed_blue.png', description: '폭신한 파랑 침대', unlockStage: 1 },
         { name: '파랑 조명', category: 'light', price: 270, imageUrl: '/static/furniture/light_blue.png', description: '은은한 파랑 조명', unlockStage: 1 },
         { name: '파랑 러그', category: 'rug', price: 310, imageUrl: '/static/furniture/rug_blue.png', description: '폭신한 파랑 러그', unlockStage: 1 },
       ],
     });
-    console.log(`  6 blue furniture shop items seeded.`);
+    console.log(`  3 blue furniture shop items seeded.`);
   } else {
     console.log(`  blue furniture already exists, skipping.`);
+  }
+
+  // 노랑 테마 (7개)
+  const yellowThemeCount = await prisma.shopItem.count({
+    where: { name: { contains: '노랑' } },
+  });
+  if (yellowThemeCount === 0) {
+    await prisma.shopItem.createMany({
+      data: [
+        { name: '노랑 러그', category: 'rug', price: 330, imageUrl: '/static/furniture/rug_yellow.jpeg', description: '포근한 노랑 러그', unlockStage: 1 },
+        { name: '노랑 시계', category: 'clock', price: 215, imageUrl: '/static/furniture/clock_yellow.jpeg', description: '벽에 거는 노랑 시계', unlockStage: 1 },
+        { name: '노랑 장난감', category: 'toy', price: 340, imageUrl: '/static/furniture/toy_yellow.jpeg', description: '귀여운 노랑 장난감', unlockStage: 1 },
+        { name: '노랑 조명', category: 'light', price: 260, imageUrl: '/static/furniture/light_yellow.jpeg', description: '따뜻한 노랑 조명', unlockStage: 1 },
+        { name: '노랑 책상', category: 'desk', price: 430, imageUrl: '/static/furniture/desk_yellow.jpeg', description: '밝은 노랑 책상', unlockStage: 1 },
+        { name: '노랑 책장', category: 'shelf', price: 370, imageUrl: '/static/furniture/shelf_yellow.jpeg', description: '튼튼한 노랑 책장', unlockStage: 1 },
+        { name: '노랑 침대', category: 'bed', price: 560, imageUrl: '/static/furniture/bed_yellow.jpeg', description: '폭신한 노랑 침대', unlockStage: 1 },
+      ],
+    });
+    console.log(`  7 yellow furniture shop items seeded.`);
+  } else {
+    console.log(`  yellow furniture already exists, skipping.`);
   }
 
   // 5. Seed Diagnostic Problems (PID 10001~)

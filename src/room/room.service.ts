@@ -18,6 +18,7 @@ const ROOM_STATE_SELECT = {
   equippedLight: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedRug: { select: SHOP_ITEM_PUBLIC_SELECT },
   equippedWallpaper: { select: SHOP_ITEM_PUBLIC_SELECT },
+  equippedToy: { select: SHOP_ITEM_PUBLIC_SELECT },
   roomLayout: true,
 } as const satisfies Prisma.UserSelect;
 
@@ -33,6 +34,7 @@ function toRoomStateResponse(row: RoomStateRow) {
       light: row.equippedLight,
       rug: row.equippedRug,
       wallpaper: row.equippedWallpaper,
+      toy: row.equippedToy,
     },
     layout: row.roomLayout ?? null,
   };
