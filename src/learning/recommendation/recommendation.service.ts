@@ -8,10 +8,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../../common/constants/user-select';
 import { PROBLEM_PUBLIC_SELECT } from '../../common/constants/learning-select';
-import {
-  DIAGNOSTIC_PID_MIN,
-  DKT_ELIGIBLE_SOURCES,
-} from '../../common/constants/diagnostic';
+import { DIAGNOSTIC_PID_MIN } from '../../common/constants/diagnostic';
 import { RecordSource } from '@prisma/client';
 import { DktService } from '../../dkt/dkt.service';
 import { ConceptCatalogService } from '../concept-catalog.service';
@@ -75,9 +72,18 @@ export class RecommendationService {
 
     const [records, allTagsWithGrade, gradeProblems, solvedCorrectRows] =
       await Promise.all([
-        // 시계열: 진단 + 추천 세션 기록만. 개념 학습(CONCEPT)은 DKT 시계열에서 제외.
+        // 시계열: 진단(PID >= DIAGNOSTIC_PID_MIN) + 추천 세션(source) 기록만.
+        // 일반 개념 학습(problemId < DIAGNOSTIC_PID_MIN & CONCEPT)은 DKT 시계열에서 제외.
+        // 진단 식별은 source 가 아닌 PID 기준 — 레거시 데이터(source=CONCEPT 로 저장된
+        // 진단 기록)에서도 견고하게 동작한다 (getDiagnosticProfile 과 동일 패턴).
         this.prisma.learningRecord.findMany({
-          where: { userId, source: { in: [...DKT_ELIGIBLE_SOURCES] } },
+          where: {
+            userId,
+            OR: [
+              { problemId: { gte: DIAGNOSTIC_PID_MIN } },
+              { source: RecordSource.RECOMMENDATION },
+            ],
+          },
           orderBy: { createdAt: 'desc' },
           take: DKT_SEQUENCE_LIMIT,
           select: {
@@ -385,6 +391,37 @@ export class RecommendationService {
       explanation: problem.explanation,
       user: updatedUser,
     };
+  }
+
+  async getHistory(userId: string) {
+    const records = await this.prisma.learningRecord.findMany({
+      where: { userId, source: RecordSource.RECOMMENDATION },
+      select: { createdAt: true, correct: true, coinsEarned: true },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+
+    const byDate = new Map<
+      string,
+      { totalProblems: number; correctCount: number; coinsEarned: number }
+    >();
+    for (const r of records) {
+      const key = r.createdAt.toISOString().slice(0, 10);
+      const g = byDate.get(key) ?? {
+        totalProblems: 0,
+        correctCount: 0,
+        coinsEarned: 0,
+      };
+      g.totalProblems++;
+      if (r.correct) g.correctCount++;
+      g.coinsEarned += r.coinsEarned;
+      byDate.set(key, g);
+    }
+
+    return [...byDate.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 20)
+      .map(([date, s]) => ({ date, ...s }));
   }
 }
 

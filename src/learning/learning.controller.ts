@@ -18,6 +18,11 @@ import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 export class LearningController {
   constructor(private readonly learning: LearningService) {}
 
+  @Get('attendance')
+  getAttendance(@CurrentUser('sub') userId: string) {
+    return this.learning.getAttendance(userId);
+  }
+
   @Get('stages')
   getStages(@CurrentUser('sub') userId: string) {
     return this.learning.getStages(userId);

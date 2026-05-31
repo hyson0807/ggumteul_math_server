@@ -642,6 +642,34 @@ export class LearningService {
     };
   }
 
+  async getAttendance(userId: string) {
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setUTCDate(sixtyDaysAgo.getUTCDate() - 60);
+
+    const records = await this.prisma.learningRecord.findMany({
+      where: { userId, createdAt: { gte: sixtyDaysAgo } },
+      select: { createdAt: true },
+    });
+
+    const activeDatesSet = new Set(
+      records.map((r) => r.createdAt.toISOString().slice(0, 10)),
+    );
+    const activeDates = [...activeDatesSet].sort((a, b) => b.localeCompare(a));
+
+    let streak = 0;
+    const cursor = new Date();
+    while (activeDatesSet.has(cursor.toISOString().slice(0, 10))) {
+      streak++;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+
+    return {
+      currentStreak: streak,
+      totalActiveDays: activeDatesSet.size,
+      activeDates,
+    };
+  }
+
   private async countClearedByConcept(
     userId: string,
     conceptIds?: number[],
