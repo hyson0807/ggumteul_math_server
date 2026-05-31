@@ -1,4 +1,11 @@
+import { RecordSource } from '@prisma/client';
+
 export const DIAGNOSTIC_PID_MIN = 10001;
+
+export const DKT_ELIGIBLE_SOURCES = [
+  RecordSource.DIAGNOSTIC,
+  RecordSource.RECOMMENDATION,
+] as const;
 
 export const DIAGNOSTIC_PROBLEM_IDS: Record<1 | 2 | 3, readonly number[]> = {
   1: [10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008, 10009, 10010],

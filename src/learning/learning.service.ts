@@ -20,6 +20,7 @@ import {
   DIAGNOSTIC_PID_MIN,
   getDiagnosticIds,
 } from '../common/constants/diagnostic';
+import { RecordSource } from '@prisma/client';
 import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 import { DktService } from '../dkt/dkt.service';
 import { calcCoinReward, resolveCorrectAnswer } from './utils/rewards';
@@ -314,6 +315,7 @@ export class LearningService {
         data: {
           userId,
           problemId: problem.id,
+          source: RecordSource.CONCEPT,
           correct,
           answerGiven: givenAnswer,
           timeSpent: dto.timeSpent,
@@ -446,6 +448,7 @@ export class LearningService {
       return {
         userId,
         problemId: a.problemId,
+        source: RecordSource.DIAGNOSTIC,
         correct: givenAnswer === correctText,
         answerGiven: givenAnswer,
         timeSpent: a.timeSpent ?? 0,

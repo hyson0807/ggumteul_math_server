@@ -8,7 +8,11 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../../common/constants/user-select';
 import { PROBLEM_PUBLIC_SELECT } from '../../common/constants/learning-select';
-import { DIAGNOSTIC_PID_MIN } from '../../common/constants/diagnostic';
+import {
+  DIAGNOSTIC_PID_MIN,
+  DKT_ELIGIBLE_SOURCES,
+} from '../../common/constants/diagnostic';
+import { RecordSource } from '@prisma/client';
 import { DktService } from '../../dkt/dkt.service';
 import { ConceptCatalogService } from '../concept-catalog.service';
 import { calcCoinReward, resolveCorrectAnswer } from '../utils/rewards';
@@ -71,9 +75,9 @@ export class RecommendationService {
 
     const [records, allTagsWithGrade, gradeProblems, solvedCorrectRows] =
       await Promise.all([
-        // 시계열: 진단 + 일반 모두 포함, 시간순. 최근 N건만 (DKT max_seq_len 보호).
+        // 시계열: 진단 + 추천 세션 기록만. 개념 학습(CONCEPT)은 DKT 시계열에서 제외.
         this.prisma.learningRecord.findMany({
-          where: { userId },
+          where: { userId, source: { in: [...DKT_ELIGIBLE_SOURCES] } },
           orderBy: { createdAt: 'desc' },
           take: DKT_SEQUENCE_LIMIT,
           select: {
@@ -358,6 +362,7 @@ export class RecommendationService {
         data: {
           userId,
           problemId: problem.id,
+          source: RecordSource.RECOMMENDATION,
           correct,
           answerGiven: userAnswer,
           timeSpent: dto.timeSpent,

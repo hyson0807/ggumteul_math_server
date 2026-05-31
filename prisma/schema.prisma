@@ -130,20 +130,28 @@ model Problem {
 // ──────────────────────────────────
 // Learning Record
 // ──────────────────────────────────
+enum RecordSource {
+  DIAGNOSTIC
+  CONCEPT
+  RECOMMENDATION
+}
+
 model LearningRecord {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  problemId   Int      @map("problem_id")
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  problemId   Int          @map("problem_id")
+  source      RecordSource @default(CONCEPT)
   correct     Boolean
-  answerGiven String   @map("answer_given")
-  timeSpent   Int      @map("time_spent")
-  coinsEarned Int      @map("coins_earned")
-  starsEarned Int      @map("stars_earned")
-  createdAt   DateTime @default(now()) @map("created_at")
+  answerGiven String       @map("answer_given")
+  timeSpent   Int          @map("time_spent")
+  coinsEarned Int          @map("coins_earned")
+  starsEarned Int          @map("stars_earned")
+  createdAt   DateTime     @default(now()) @map("created_at")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem Problem @relation(fields: [problemId], references: [id])
 
+  @@index([userId, source, createdAt(sort: Desc)])
   @@map("learning_record")
 }
 
