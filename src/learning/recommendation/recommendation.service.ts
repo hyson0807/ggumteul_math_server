@@ -369,6 +369,7 @@ export class RecommendationService {
           userId,
           problemId: problem.id,
           source: RecordSource.RECOMMENDATION,
+          sessionId: dto.sessionId ?? null,
           correct,
           answerGiven: userAnswer,
           timeSpent: dto.timeSpent,
@@ -396,32 +397,56 @@ export class RecommendationService {
   async getHistory(userId: string) {
     const records = await this.prisma.learningRecord.findMany({
       where: { userId, source: RecordSource.RECOMMENDATION },
-      select: { createdAt: true, correct: true, coinsEarned: true },
+      select: {
+        sessionId: true,
+        createdAt: true,
+        correct: true,
+        coinsEarned: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
 
-    const byDate = new Map<
-      string,
-      { totalProblems: number; correctCount: number; coinsEarned: number }
-    >();
+    // 세션 단위 그룹핑. sessionId 가 있으면 세션 키로 묶고, 없으면(구버전 기록)
+    // 날짜 단위로 묶어 과거 동작과 호환시킨다.
+    interface SessionGroup {
+      sessionId: string | null;
+      startedAt: Date; // 세션 내 가장 이른 기록 시각
+      totalProblems: number;
+      correctCount: number;
+      coinsEarned: number;
+    }
+    const groups = new Map<string, SessionGroup>();
     for (const r of records) {
-      const key = r.createdAt.toISOString().slice(0, 10);
-      const g = byDate.get(key) ?? {
-        totalProblems: 0,
-        correctCount: 0,
-        coinsEarned: 0,
-      };
-      g.totalProblems++;
-      if (r.correct) g.correctCount++;
-      g.coinsEarned += r.coinsEarned;
-      byDate.set(key, g);
+      const key = r.sessionId ?? `date:${r.createdAt.toISOString().slice(0, 10)}`;
+      const g = groups.get(key);
+      if (!g) {
+        groups.set(key, {
+          sessionId: r.sessionId,
+          startedAt: r.createdAt,
+          totalProblems: 1,
+          correctCount: r.correct ? 1 : 0,
+          coinsEarned: r.coinsEarned,
+        });
+      } else {
+        g.totalProblems++;
+        if (r.correct) g.correctCount++;
+        g.coinsEarned += r.coinsEarned;
+        // records 는 createdAt desc — 더 이른 시각으로 startedAt 갱신
+        if (r.createdAt < g.startedAt) g.startedAt = r.createdAt;
+      }
     }
 
-    return [...byDate.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .slice(0, 20)
-      .map(([date, s]) => ({ date, ...s }));
+    return [...groups.values()]
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, 30)
+      .map((g) => ({
+        sessionId: g.sessionId,
+        startedAt: g.startedAt.toISOString(),
+        totalProblems: g.totalProblems,
+        correctCount: g.correctCount,
+        coinsEarned: g.coinsEarned,
+      }));
   }
 }
 

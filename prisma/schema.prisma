@@ -141,6 +141,8 @@ model LearningRecord {
   userId      String       @map("user_id")
   problemId   Int          @map("problem_id")
   source      RecordSource @default(CONCEPT)
+  // 추천 세션 1회를 묶는 식별자 (startSession 이 발급). 진단/일반 학습은 null.
+  sessionId   String?      @map("session_id")
   correct     Boolean
   answerGiven String       @map("answer_given")
   timeSpent   Int          @map("time_spent")
