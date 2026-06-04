@@ -112,11 +112,14 @@ export class RecommendationService {
             },
           },
         }),
-        // 이미 정답 맞힌 problemId — 추천 풀에서 제외
+        // 추천 세션에서 이미 정답 맞힌 problemId — 추천 풀에서 제외.
+        // 개념 학습(CONCEPT)은 별도 트랙이므로 제외하지 않는다 (DKT 시계열과 동일하게
+        // 추천 트랙만 본다). 개념 학습에서 맞힌 문제도 추천/복습으로 다시 나올 수 있다.
         this.prisma.learningRecord.findMany({
           where: {
             userId,
             correct: true,
+            source: RecordSource.RECOMMENDATION,
             problemId: { lt: DIAGNOSTIC_PID_MIN },
           },
           select: { problemId: true },
