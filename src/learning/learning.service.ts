@@ -629,13 +629,25 @@ export class LearningService {
   }
 
   /**
-   * 개념 상태 — 최근 학습 기록(진단 제외)을 개념별로 모아 분류한다.
-   *   - growing(🌱 성장중): 과거 오답이 있었으나 가장 최근 시도가 정답인 개념
-   *   - struggling(🔥 연속 오답): 가장 최근 기록이 연속 3회 이상 오답인 개념
+   * 개념 상태 — 최근 일정 기간의 추천 세션 기록만 개념별로 모아 분류한다.
+   * 시간 창으로 한정해 "현재" 상태만 반영한다 (오래전 기록은 자연히 제외).
+   *   - growing(🌱 성장중): 창 안에서 과거 오답이 있었으나 가장 최근 시도가 정답인 개념
+   *   - struggling(🔥 연속 오답): 창 안에서 가장 최근 기록이 연속 3회 이상 오답인 개념
    */
   async getConceptStatus(userId: string) {
+    // 최근 7일(약 1주일) 이내의 추천 세션 기록만 본다.
+    const CONCEPT_STATUS_WINDOW_DAYS = 7;
+    const windowStart = new Date();
+    windowStart.setUTCDate(
+      windowStart.getUTCDate() - CONCEPT_STATUS_WINDOW_DAYS,
+    );
+
     const records = await this.prisma.learningRecord.findMany({
-      where: { userId, problemId: { lt: DIAGNOSTIC_PID_MIN } },
+      where: {
+        userId,
+        source: RecordSource.RECOMMENDATION,
+        createdAt: { gte: windowStart },
+      },
       orderBy: { createdAt: 'desc' },
       take: 300,
       select: {
@@ -653,7 +665,7 @@ export class LearningService {
       name: string;
       grade: number;
       semester: number;
-      recs: boolean[]; // 시간 오름차순
+      recs: boolean[]; // createdAt 내림차순 (recs[0] = 가장 최근)
     }
     const byConcept = new Map<number, Group>();
     // records 는 createdAt desc — push 후 한 번만 reverse 해 오름차순으로 만든다.
