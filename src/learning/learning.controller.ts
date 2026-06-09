@@ -59,6 +59,11 @@ export class LearningController {
     return this.learning.getDiagnosticProfile(userId);
   }
 
+  @Get('concept-status')
+  getConceptStatus(@CurrentUser('sub') userId: string) {
+    return this.learning.getConceptStatus(userId);
+  }
+
   @Get('diagnostic/:grade')
   getDiagnostic(@Param('grade', ParseIntPipe) grade: number) {
     return this.learning.getDiagnostic(grade);

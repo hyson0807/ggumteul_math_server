@@ -36,6 +36,30 @@ export function semesterToStage(grade: number, semester: number): number {
   return Number(entry[0]);
 }
 
+// ──────────────────────────────────
+// 애벌레 레벨 / 먹이 (수학 진도 wormStage 와 분리)
+// ──────────────────────────────────
+// 플레이가능 개념(문제 id < DIAGNOSTIC_PID_MIN 보유) 총 수 = 한 사용자가 모든 개념을
+// 클리어해 얻을 수 있는 최대 먹이 수. (시드 기준 229개, problem.csv distinct concept_id)
+export const MAX_FEED = 229;
+// 애벌레 최고 레벨 (assets/images/caterpillars/level-01~10)
+export const WORM_MAX_LEVEL = 10;
+
+// 레벨 n 에 도달하는 데 필요한 누적 소비 먹이 임계값.
+// threshold(1)=0, threshold(WORM_MAX_LEVEL)=MAX_FEED 가 되도록 균등 분배 →
+// 모든 개념을 클리어(=MAX_FEED 먹이 소비)하면 정확히 최고 레벨에 도달한다.
+export function feedThreshold(level: number): number {
+  return Math.round(((level - 1) / (WORM_MAX_LEVEL - 1)) * MAX_FEED);
+}
+
+// 누적 소비 먹이 수 → 애벌레 레벨 (1 ~ WORM_MAX_LEVEL)
+export function levelForConsumed(consumed: number): number {
+  for (let n = WORM_MAX_LEVEL; n >= 2; n--) {
+    if (consumed >= feedThreshold(n)) return n;
+  }
+  return 1;
+}
+
 export const EQUIP_SLOTS = ['hat', 'body', 'accessory'] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 

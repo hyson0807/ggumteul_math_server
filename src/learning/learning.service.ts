@@ -23,7 +23,7 @@ import {
 import { RecordSource } from '@prisma/client';
 import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 import { DktService } from '../dkt/dkt.service';
-import { calcCoinReward, resolveCorrectAnswer } from './utils/rewards';
+import { resolveCorrectAnswer } from './utils/rewards';
 import { ConceptCatalogService } from './concept-catalog.service';
 
 @Injectable()
@@ -80,7 +80,7 @@ export class LearningService {
         semester,
         totalNodes,
         clearedNodes,
-        locked: stage > user.wormStage,
+        locked: false, // 모든 학기 개방
         current: stage === user.wormStage,
         cleared: totalNodes > 0 && clearedNodes >= totalNodes,
       };
@@ -121,30 +121,18 @@ export class LearningService {
     ]);
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
-    const stageLocked = stage > user.wormStage;
+    const stageLocked = false; // 모든 학기 개방
     const playableTotals = new Map<number, number>();
     for (const c of concepts) {
       if (c._count.problems > 0) playableTotals.set(c.id, c._count.problems);
     }
     const clearedSet = await this.getClearedConceptSet(userId, playableTotals);
 
-    // 선형 잠금: 첫 번째 미클리어 플레이가능 노드 = 활성, 그 뒤 플레이가능 노드 = 잠금
-    let firstUnclearedSeen = false;
+    // 잠금 해제: 플레이가능 노드는 모두 활성. 문제 없는 노드만 잠금.
     const nodes = concepts.map((concept) => {
       const playable = concept._count.problems > 0;
       const cleared = playable && clearedSet.has(concept.id);
-
-      let locked: boolean;
-      if (stageLocked || !playable) {
-        locked = true;
-      } else if (cleared) {
-        locked = false;
-      } else if (!firstUnclearedSeen) {
-        firstUnclearedSeen = true;
-        locked = false;
-      } else {
-        locked = true;
-      }
+      const locked = !playable;
 
       return {
         conceptId: concept.id,
@@ -171,14 +159,10 @@ export class LearningService {
   }
 
   async getConceptProblems(userId: string, conceptId: number) {
-    const [concept, user, problems, solvedRows] = await Promise.all([
+    const [concept, problems, solvedRows] = await Promise.all([
       this.prisma.concept.findUnique({
         where: { id: conceptId },
         select: CONCEPT_NODE_SELECT,
-      }),
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { wormStage: true },
       }),
       this.prisma.problem.findMany({
         where: { conceptId, id: { lt: DIAGNOSTIC_PID_MIN } },
@@ -197,12 +181,6 @@ export class LearningService {
       }),
     ]);
     if (!concept) throw new NotFoundException('개념을 찾을 수 없습니다.');
-    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
-
-    const stage = semesterToStage(concept.grade, concept.semester);
-    if (stage > user.wormStage) {
-      throw new BadRequestException('아직 잠금 해제되지 않은 스테이지입니다.');
-    }
 
     const solvedProblemIds = new Set(solvedRows.map((r) => r.problemId));
 
@@ -249,16 +227,11 @@ export class LearningService {
     });
     if (!problem) throw new NotFoundException('문제를 찾을 수 없습니다.');
 
-    const stage = semesterToStage(
-      problem.concept.grade,
-      problem.concept.semester,
-    );
     const givenAnswer = dto.answer.trim();
     const correctAnswerText = resolveCorrectAnswer(problem);
     const correct = givenAnswer === correctAnswerText;
-    const coinsEarned = correct
-      ? calcCoinReward(problem.difficulty, dto.timeSpent)
-      : 0;
+    // 개념 학습은 문제별 코인 미지급 — 보상은 개념 클리어 시 먹이 1개. (추천 세션은 코인 유지)
+    const coinsEarned = 0;
 
     // 정적 데이터이므로 트랜잭션 락 밖에서 미리 조회
     const totalNodesPromise = correct
@@ -287,14 +260,10 @@ export class LearningService {
           wormProgress: true,
           coins: true,
           stars: true,
+          feed: true,
         },
       });
       if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
-      if (stage > user.wormStage) {
-        throw new BadRequestException(
-          '아직 잠금 해제되지 않은 스테이지입니다.',
-        );
-      }
 
       const priorCorrectIds = await tx.learningRecord.findMany({
         where: {
@@ -349,11 +318,14 @@ export class LearningService {
       }
 
       const starsEarned = stageNewlyCleared ? 1 : 0;
+      // 개념 클리어(노드 새로 클리어) 시 먹이 1개 지급
+      const feedEarned = nodeNewlyCleared ? 1 : 0;
       const updatedUser = await tx.user.update({
         where: { id: userId },
         data: {
           coins: user.coins + coinsEarned,
           stars: user.stars + starsEarned,
+          feed: user.feed + feedEarned,
           wormStage: nextStage,
           wormProgress: nextProgress,
         },
@@ -364,6 +336,7 @@ export class LearningService {
         correct,
         coinsEarned,
         starsEarned,
+        feedEarned,
         nodeNewlyCleared,
         stageNewlyCleared,
         correctAnswer: correctAnswerText,
@@ -608,6 +581,7 @@ export class LearningService {
       knowledgeTags,
       corrects,
       restrictToTags,
+      topK: 2, // 분석탭은 강·약점 각 2개만 노출 (추천 세션 약점 2개념과 정합)
     });
 
     const allEntries = [
@@ -652,6 +626,92 @@ export class LearningService {
       weak: enrich(dkt.diagnosis.bottom_weak),
       fetchedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * 개념 상태 — 최근 학습 기록(진단 제외)을 개념별로 모아 분류한다.
+   *   - growing(🌱 성장중): 과거 오답이 있었으나 가장 최근 시도가 정답인 개념
+   *   - struggling(🔥 연속 오답): 가장 최근 기록이 연속 3회 이상 오답인 개념
+   */
+  async getConceptStatus(userId: string) {
+    const records = await this.prisma.learningRecord.findMany({
+      where: { userId, problemId: { lt: DIAGNOSTIC_PID_MIN } },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+      select: {
+        correct: true,
+        problem: {
+          select: {
+            conceptId: true,
+            concept: { select: { name: true, grade: true, semester: true } },
+          },
+        },
+      },
+    });
+
+    interface Group {
+      name: string;
+      grade: number;
+      semester: number;
+      recs: boolean[]; // 시간 오름차순
+    }
+    const byConcept = new Map<number, Group>();
+    // records 는 createdAt desc — push 후 한 번만 reverse 해 오름차순으로 만든다.
+    for (const r of records) {
+      const cid = r.problem.conceptId;
+      let g = byConcept.get(cid);
+      if (!g) {
+        g = {
+          name: r.problem.concept.name,
+          grade: r.problem.concept.grade,
+          semester: r.problem.concept.semester,
+          recs: [],
+        };
+        byConcept.set(cid, g);
+      }
+      g.recs.push(r.correct);
+    }
+
+    const growing: {
+      conceptId: number;
+      conceptName: string;
+      grade: number;
+      semester: number;
+    }[] = [];
+    const struggling: typeof growing = [];
+
+    for (const [conceptId, g] of byConcept) {
+      const recs = g.recs; // desc(최신→과거)
+      if (recs.length === 0) continue;
+      const last = recs[0]; // 가장 최근
+      // recs[0] 부터 연속 오답 수, 그 이후 오답 존재 여부를 한 번에 계산
+      let trailingWrong = 0;
+      let counting = true;
+      let hasPriorWrong = false;
+      for (let i = 0; i < recs.length; i++) {
+        if (recs[i]) {
+          counting = false;
+        } else if (counting) {
+          trailingWrong++;
+        } else {
+          hasPriorWrong = true;
+          break;
+        }
+      }
+      const entry = {
+        conceptId,
+        conceptName: g.name,
+        grade: g.grade,
+        semester: g.semester,
+      };
+      if (last && hasPriorWrong) {
+        growing.push(entry);
+      } else if (trailingWrong >= 3) {
+        struggling.push(entry);
+      }
+    }
+
+    return { growing, struggling };
   }
 
   async getAttendance(userId: string) {

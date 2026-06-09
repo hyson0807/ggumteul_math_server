@@ -14,6 +14,11 @@ export class WormController {
     return this.worm.getWormState(userId);
   }
 
+  @Post('feed')
+  feed(@CurrentUser('sub') userId: string) {
+    return this.worm.feedWorm(userId);
+  }
+
   @Post('equip')
   equip(@CurrentUser('sub') userId: string, @Body() dto: EquipDto) {
     return this.worm.equip(userId, dto.slot, dto.shopItemId);

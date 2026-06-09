@@ -28,6 +28,12 @@ model User {
   wormStage    Int      @default(1) @map("worm_stage")
   wormProgress Int      @default(0) @map("worm_progress")
 
+  // 애벌레 레벨/먹이 (수학 진도 wormStage 와 분리). 개념 클리어 시 feed +1,
+  // 홈에서 애벌레 탭으로 먹이를 먹으면 feed -1 / feedConsumed +1 / wormLevel 재계산.
+  feed         Int      @default(0) @map("feed")
+  feedConsumed Int      @default(0) @map("feed_consumed")
+  wormLevel    Int      @default(1) @map("worm_level")
+
   equippedHatId       String? @map("equipped_hat_id")
   equippedBodyId      String? @map("equipped_body_id")
   equippedAccessoryId String? @map("equipped_accessory_id")

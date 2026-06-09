@@ -20,8 +20,9 @@ const SESSION_SIZE = 5;
 // ProblemPriority 기반으로 뽑는 추천 문제 수 (나머지는 학년 풀 랜덤)
 const RECOMMENDED_COUNT = 2;
 const RANDOM_COUNT = SESSION_SIZE - RECOMMENDED_COUNT;
-// DKT bottom_weak top-K — PrerequisiteNeed 계산 시 "후행 약점" 정의에 사용
-const BOTTOM_WEAK_K = 5;
+// DKT bottom_weak top-K — 추천 문제는 약점 상위 2개 개념에서 각 1문제씩 출제.
+// (분석탭 약점 2개와 정합)
+const BOTTOM_WEAK_K = 2;
 // DKT 시계열 길이 상한 (모델 max_seq_len 보호 + 추론 시간 안정화)
 const DKT_SEQUENCE_LIMIT = 200;
 // 시계열에 없는 concept 의 P_DKT 디폴트 (중립값)
@@ -252,9 +253,30 @@ export class RecommendationService {
       })
       .sort((a, b) => b.score - a.score);
 
-    const recommendedProblems = scored
-      .slice(0, RECOMMENDED_COUNT)
-      .map((s) => s.problem);
+    // 약점 상위 2개 개념에서 각각 1문제씩 추천. bottom_weak 은 약점 강도 순.
+    // 각 개념 내에서는 ProblemPriority(=scored desc) 가 가장 높은 문제를 고른다.
+    const weakTagOrder = dkt.diagnosis.bottom_weak.map((e) => e.knowledge_tag);
+    const recommendedProblems: (typeof candidatePool)[number][] = [];
+    const usedConceptIds = new Set<number>();
+    for (const tag of weakTagOrder) {
+      if (recommendedProblems.length >= RECOMMENDED_COUNT) break;
+      const best = scored.find(
+        (s) =>
+          s.problem.concept.knowledgeTag === tag &&
+          !usedConceptIds.has(s.problem.concept.id),
+      );
+      if (best) {
+        recommendedProblems.push(best.problem);
+        usedConceptIds.add(best.problem.concept.id);
+      }
+    }
+    // 약점 개념이 부족하면 ProblemPriority 상위 문제(서로 다른 개념 우선)로 보충
+    for (const s of scored) {
+      if (recommendedProblems.length >= RECOMMENDED_COUNT) break;
+      if (usedConceptIds.has(s.problem.concept.id)) continue;
+      recommendedProblems.push(s.problem);
+      usedConceptIds.add(s.problem.concept.id);
+    }
     const recommendedIds = new Set(recommendedProblems.map((p) => p.id));
 
     const randomCandidates = candidatePool.filter(
