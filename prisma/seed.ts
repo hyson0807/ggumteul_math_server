@@ -260,6 +260,27 @@ async function main() {
     console.log(`  window already exists, skipping.`);
   }
 
+  // repair: 노랑/창문 가구는 과거 .jpeg 로 시드된 뒤 파일이 .png 로 교체(.jpeg 삭제)되었으나,
+  // 위 시드 블록은 멱등 가드(count===0)라 기존 행 imageUrl 을 갱신하지 못한다.
+  // → DB 에 남은 죽은 .jpeg URL 을 .png 로 교정한다. (멱등: 이미 .png 면 0건)
+  const staleJpeg = await prisma.shopItem.findMany({
+    where: { imageUrl: { endsWith: '.jpeg' } },
+    select: { id: true, imageUrl: true },
+  });
+  if (staleJpeg.length > 0) {
+    await prisma.$transaction(
+      staleJpeg.map((item) =>
+        prisma.shopItem.update({
+          where: { id: item.id },
+          data: { imageUrl: item.imageUrl!.replace(/\.jpeg$/, '.png') },
+        }),
+      ),
+    );
+    console.log(`  repaired ${staleJpeg.length} shop item imageUrl (.jpeg → .png).`);
+  } else {
+    console.log(`  no stale .jpeg imageUrl to repair.`);
+  }
+
   // 5. Seed Diagnostic Problems (PID 10001~)
   console.log('Seeding diagnostic problems...');
   const diagnostics = parseCsv(path.join(seedDataDir, 'diagnostic.csv'));
