@@ -20,6 +20,7 @@ import {
   DIAGNOSTIC_PID_MIN,
   getDiagnosticIds,
 } from '../common/constants/diagnostic';
+import { DKT_SEQUENCE_LIMIT } from '../common/constants/dkt';
 import { RecordSource } from '@prisma/client';
 import { CompleteDiagnosticDto } from './dto/complete-diagnostic.dto';
 import { DktService } from '../dkt/dkt.service';
@@ -529,7 +530,8 @@ export class LearningService {
   }
 
   async getDiagnosticProfile(userId: string) {
-    // 진단평가는 학년당 1회 idempotent 라 사용자별 record 는 단일 학년 (10개) 만 존재.
+    // DKT 시계열 = 진단(PID >= DIAGNOSTIC_PID_MIN) + 추천 세션(source) 기록.
+    // 추천탭 풀이가 쌓일수록 강·약점이 최신 상태로 갱신된다 (startSession 과 동일 패턴).
     // user 검증·records·캐시된 tag 풀은 서로 의존성 없어 병렬 fetch.
     const [user, records, allTagsWithGrade] = await Promise.all([
       this.prisma.user.findUnique({
@@ -540,8 +542,15 @@ export class LearningService {
         },
       }),
       this.prisma.learningRecord.findMany({
-        where: { userId, problemId: { gte: DIAGNOSTIC_PID_MIN } },
-        orderBy: { createdAt: 'asc' },
+        where: {
+          userId,
+          OR: [
+            { problemId: { gte: DIAGNOSTIC_PID_MIN } },
+            { source: RecordSource.RECOMMENDATION },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: DKT_SEQUENCE_LIMIT,
         select: {
           correct: true,
           problem: {
@@ -557,9 +566,11 @@ export class LearningService {
       throw new NotFoundException('아직 진단평가를 완료하지 않았습니다.');
     }
 
+    // desc 로 받았으니 시간 오름차순으로 뒤집어 DKT 에 전달
+    const orderedRecords = [...records].reverse();
     const knowledgeTags: number[] = [];
     const corrects: (0 | 1)[] = [];
-    for (const r of records) {
+    for (const r of orderedRecords) {
       const tag = r.problem.concept.knowledgeTag;
       if (tag === null || tag === undefined) continue;
       knowledgeTags.push(tag);
@@ -632,7 +643,7 @@ export class LearningService {
    * 개념 상태 — 최근 일정 기간의 추천 세션 기록만 개념별로 모아 분류한다.
    * 시간 창으로 한정해 "현재" 상태만 반영한다 (오래전 기록은 자연히 제외).
    *   - growing(🌱 성장중): 창 안에서 과거 오답이 있었으나 가장 최근 시도가 정답인 개념
-   *   - struggling(🔥 연속 오답): 창 안에서 가장 최근 기록이 연속 3회 이상 오답인 개념
+   *   - struggling(🔥 연속 오답): 창 안에서 가장 최근 기록이 연속 2회 이상 오답인 개념
    */
   async getConceptStatus(userId: string) {
     // 최근 7일(약 1주일) 이내의 추천 세션 기록만 본다.
@@ -718,7 +729,7 @@ export class LearningService {
       };
       if (last && hasPriorWrong) {
         growing.push(entry);
-      } else if (trailingWrong >= 3) {
+      } else if (trailingWrong >= 2) {
         struggling.push(entry);
       }
     }

@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { USER_PUBLIC_SELECT } from '../../common/constants/user-select';
 import { PROBLEM_PUBLIC_SELECT } from '../../common/constants/learning-select';
 import { DIAGNOSTIC_PID_MIN } from '../../common/constants/diagnostic';
+import { DKT_SEQUENCE_LIMIT } from '../../common/constants/dkt';
 import { RecordSource } from '@prisma/client';
 import { DktService } from '../../dkt/dkt.service';
 import { ConceptCatalogService } from '../concept-catalog.service';
@@ -23,8 +24,6 @@ const RANDOM_COUNT = SESSION_SIZE - RECOMMENDED_COUNT;
 // DKT bottom_weak top-K — 추천 문제는 약점 상위 2개 개념에서 각 1문제씩 출제.
 // (분석탭 약점 2개와 정합)
 const BOTTOM_WEAK_K = 2;
-// DKT 시계열 길이 상한 (모델 max_seq_len 보호 + 추론 시간 안정화)
-const DKT_SEQUENCE_LIMIT = 200;
 // 시계열에 없는 concept 의 P_DKT 디폴트 (중립값)
 const DEFAULT_P_DKT = 0.5;
 // 문제 difficulty (-3, 0, 3) → 정규화된 난이도 (0.2, 0.5, 0.8)
