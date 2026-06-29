@@ -17,6 +17,9 @@ COPY prisma.config.ts ./prisma.config.ts
 # does not connect to the database, so the builder gets a throwaway URL.
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npm ci
+
+COPY nest-cli.json tsconfig.json tsconfig.build.json ./
+COPY src ./src
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runner
